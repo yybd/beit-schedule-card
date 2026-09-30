@@ -813,7 +813,7 @@ export const disableAutoShabbat = (hass) => disableAuto(hass, 'שבת');
 // ---- the Beit dashboard ----
 
 /** The dashboard the card can create: a new one in the sidebar, with both cards. Never an existing one changed. */
-export const BEIT_DASHBOARD = { url_path: 'beit-schedules', view: 'beit', title: 'Beit', icon: 'mdi:calendar-clock' };
+export const BEIT_DASHBOARD = { url_path: 'beit-schedules', view: 'beit', title: 'Beit Schedule', icon: 'mdi:calendar-clock' };
 
 export function beitDashboardConfig() {
   return {
@@ -1066,10 +1066,10 @@ export const STRINGS = {
     edNone: 'כלום',
     edModes: 'מצבים',
     edShowCalendar: 'הצגת זמני השבת והחג',
-    edDashboard: 'דשבורד Beit בסרגל הצד',
-    edDashboardHint: 'יוצר דשבורד חדש בשם Beit עם שני הכרטיסים. דשבורדים קיימים לא משתנים.',
-    edDashboardCreate: 'צור דשבורד Beit',
-    edDashboardExists: 'הדשבורד Beit כבר קיים.',
+    edDashboard: 'דשבורד Beit Schedule בסרגל הצד',
+    edDashboardHint: 'יוצר דשבורד חדש בשם Beit Schedule עם שני הכרטיסים. דשבורדים קיימים לא משתנים.',
+    edDashboardCreate: 'צור דשבורד Beit Schedule',
+    edDashboardExists: 'הדשבורד Beit Schedule כבר קיים.',
     edDashboardCreated: 'הדשבורד נוצר ומופיע בסרגל הצד.',
     edDashboardOpen: 'פתח',
     edHeight: 'גובה',
@@ -1203,10 +1203,10 @@ export const STRINGS = {
     edNone: 'None',
     edModes: 'Modes',
     edShowCalendar: 'Show Shabbat and chag times',
-    edDashboard: 'A Beit dashboard in the sidebar',
-    edDashboardHint: 'Creates a new dashboard named Beit with both cards. Existing dashboards are not changed.',
-    edDashboardCreate: 'Create the Beit dashboard',
-    edDashboardExists: 'The Beit dashboard already exists.',
+    edDashboard: 'A Beit Schedule dashboard in the sidebar',
+    edDashboardHint: 'Creates a new dashboard named Beit Schedule with both cards. Existing dashboards are not changed.',
+    edDashboardCreate: 'Create the Beit Schedule dashboard',
+    edDashboardExists: 'The Beit Schedule dashboard already exists.',
     edDashboardCreated: 'The dashboard was created; it is in the sidebar.',
     edDashboardOpen: 'Open',
     edHeight: 'Height',

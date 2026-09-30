@@ -106,10 +106,10 @@ Written with `POST /api/config/automation/config/<id>`. From a card this is `has
   - Neither automatic automation is ever a member of a mode: it would switch itself off.
   - The Beit app does not create automatic chag yet; it sees it as an ordinary automation carrying the marker.
 
-## 3a. The Beit dashboard
+## 3a. The Beit Schedule dashboard
 
 On request (a button in either card's visual editor, admins only) the card creates one new storage dashboard:
-`lovelace/dashboards/create {url_path: "beit-schedules", title: "Beit", icon: "mdi:calendar-clock", show_in_sidebar: true,
+`lovelace/dashboards/create {url_path: "beit-schedules", title: "Beit Schedule", icon: "mdi:calendar-clock", show_in_sidebar: true,
 require_admin: false, mode: "storage"}`, then `lovelace/config/save` with one view holding both cards. If a dashboard with
 that `url_path` exists, nothing is written. If the save fails, the new dashboard is deleted again
 (`lovelace/dashboards/delete {dashboard_id}`). No existing dashboard is ever changed.

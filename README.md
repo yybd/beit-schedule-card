@@ -154,16 +154,16 @@ HACS registers the dashboard resource for you.
 
 After installing, reload the browser. Then either:
 
-- **One click: a Beit dashboard.** Open any dashboard → ⋮ → *Edit dashboard* → *Add card* → **Beit — תזמונים /
-  Schedules**. At the top of the card's editor, **Create the Beit dashboard** adds a new dashboard named *Beit* to the
-  sidebar, with both cards. Nothing else is changed; if a Beit dashboard already exists, the button offers to open it.
+- **One click: a Beit Schedule dashboard.** Open any dashboard → ⋮ → *Edit dashboard* → *Add card* → **Beit — תזמונים /
+  Schedules**. At the top of the card's editor, **Create the Beit Schedule dashboard** adds a new dashboard named *Beit Schedule*
+  to the sidebar, with both cards. Nothing else is changed; if it already exists, the button offers to open it.
   You can close the Add card dialog without adding the card.
 - **By hand.** *Settings → Dashboards → Add dashboard → New dashboard from scratch*, name it, open it, then ⋮ → *Edit
   dashboard* → ⋮ → *Raw configuration editor*, and paste:
 
   ```yaml
   views:
-    - title: Beit
+    - title: Beit Schedule
       cards:
         - type: custom:beit-schedule-card
         - type: custom:beit-shabbat-card
