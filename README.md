@@ -13,7 +13,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/yybd/beit-schedule-card" alt="License"></a>
 </p>
 
-<p align="center"><img src="docs/card.png" alt="The schedules card and the Shabbat and chag card" width="760"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/yybd/beit-schedule-card/main/docs/card.png" alt="The schedules card and the Shabbat and chag card" width="760"></p>
 
 ---
 
@@ -53,11 +53,11 @@ All screenshots use the invented house in `tests/fixtures`, in English. The card
 
 | Editing a schedule | A new schedule for an air conditioner |
 |:-:|:-:|
-| <img src="docs/editor.png" alt="The editor: name, Shabbat mode, the automations it drives and the week" width="380"> | <img src="docs/new-schedule.png" alt="A new schedule: the device, HVAC mode, temperature and turn off at the end" width="380"> |
+| <img src="https://raw.githubusercontent.com/yybd/beit-schedule-card/main/docs/editor.png" alt="The editor: name, Shabbat mode, the automations it drives and the week" width="380"> | <img src="https://raw.githubusercontent.com/yybd/beit-schedule-card/main/docs/new-schedule.png" alt="A new schedule: the device, HVAC mode, temperature and turn off at the end" width="380"> |
 
 | Dark theme, fixed height | On a phone |
 |:-:|:-:|
-| <img src="docs/dark-english.png" alt="Both cards with a dark theme and a fixed height" width="440"> | <img src="docs/mobile.png" alt="The editor full screen on a phone" width="220"> |
+| <img src="https://raw.githubusercontent.com/yybd/beit-schedule-card/main/docs/dark-english.png" alt="Both cards with a dark theme and a fixed height" width="440"> | <img src="https://raw.githubusercontent.com/yybd/beit-schedule-card/main/docs/mobile.png" alt="The editor full screen on a phone" width="220"> |
 
 ## Why Beit Schedule Card
 
