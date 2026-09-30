@@ -284,6 +284,243 @@ export function buildAutoShabbatAutomation({ id, labelId, shabbatEndTrigger }) {
   };
 }
 
+// ---------------------------------------------------------------------------- time
+
+const MINUTES_PER_WEEK = 7 * 1440;
+
+/**
+ * Whether a week is "on" at `now` (local time) and when it next changes, the way HA computes a schedule's state
+ * and `next_event`. Adjacent ranges (Friday until 24:00, Saturday from 00:00) are one range.
+ */
+export function weekStatus(week, now = new Date()) {
+  const ranges = [];
+  DAYS.forEach((d, i) => {
+    for (const b of week.days[d]) ranges.push([i * 1440 + b.start, i * 1440 + b.end]);
+  });
+  ranges.sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  for (const r of ranges) {
+    const last = merged.at(-1);
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+    else merged.push([...r]);
+  }
+  if (!merged.length) return { on: false, next: null };
+  if (merged.length === 1 && merged[0][0] === 0 && merged[0][1] === MINUTES_PER_WEEK) return { on: true, next: null };
+  // A range that runs to the end of Saturday continues into Sunday's first one.
+  if (merged.length > 1 && merged.at(-1)[1] === MINUTES_PER_WEEK && merged[0][0] === 0) {
+    const tail = merged.pop();
+    merged[0] = [tail[0], merged[0][1] + MINUTES_PER_WEEK];
+  }
+  const t = now.getDay() * 1440 + now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+  const inside = (r, x) => x >= r[0] && x < r[1];
+  const on = merged.find((r) => inside(r, t) || inside(r, t + MINUTES_PER_WEEK));
+  let delta;
+  if (on) {
+    delta = (inside(on, t) ? on[1] - t : on[1] - (t + MINUTES_PER_WEEK));
+  } else {
+    delta = Math.min(...merged.map((r) => ((r[0] - t) % MINUTES_PER_WEEK + MINUTES_PER_WEEK) % MINUTES_PER_WEEK));
+  }
+  const next = new Date(now.getTime() + delta * 60000);
+  next.setSeconds(0, 0);
+  return { on: !!on, next };
+}
+
+// ---------------------------------------------------------------------------- Home Assistant operations
+//
+// Every function takes `hass`: anything with callWS, callApi, callService and a *live* `states` (the card passes an
+// adapter that always reads its latest hass). The order of calls follows the Beit app's home_store.dart.
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** HA's own error text: WebSocket errors carry `message`, REST ones (hass.callApi) `body.message` or `error`. */
+export const errorText = (err) =>
+  err?.body?.message || err?.message || (typeof err?.error === 'string' && err.error) || (typeof err === 'string' ? err : JSON.stringify(err));
+
+/** Waits for an entity to appear in the live state, matched by `test`. */
+export async function waitForEntity(hass, test, { tries = 40, every = 150 } = {}) {
+  for (let i = 0; i < tries; i++) {
+    const hit = Object.values(hass.states || {}).find(test);
+    if (hit) return hit;
+    await sleep(every);
+  }
+  throw new Error('Home Assistant did not report the new entity');
+}
+
+/** `{id: WeekSchedule}` for every UI-managed schedule. */
+export async function listSchedules(hass) {
+  const list = await hass.callWS({ type: 'schedule/list' });
+  return Object.fromEntries(list.map((s) => [s.id, WeekSchedule.fromHA(s)]));
+}
+
+export const updateSchedule = (hass, id, week) => hass.callWS({ type: 'schedule/update', schedule_id: id, ...week.toHA() });
+
+export async function automationsFor(hass, entityId) {
+  const r = await hass.callWS({ type: 'search/related', item_type: 'entity', item_id: entityId });
+  return r?.automation || [];
+}
+
+export async function automationConfig(hass, automationEntityId) {
+  const r = await hass.callWS({ type: 'automation/config', entity_id: automationEntityId });
+  return r?.config ?? null;
+}
+
+/**
+ * Creates the schedule helper and the automation that drives `target` from it; if the automation cannot be written,
+ * the helper is deleted again. Returns the new schedule's entity id.
+ */
+export async function createScheduleWithAutomation(hass, week, target, { labelName = null, waitOptions } = {}) {
+  const created = await hass.callWS({ type: 'schedule/create', ...week.toHA() });
+  const scheduleEntityId = `schedule.${created.id}`;
+  try {
+    await waitForEntity(hass, (e) => e.entity_id === scheduleEntityId, waitOptions);
+  } catch (err) {
+    await hass.callWS({ type: 'schedule/delete', schedule_id: created.id });
+    throw err;
+  }
+  const automationId = String(Date.now());
+  try {
+    await hass.callApi(
+      'POST',
+      `config/automation/config/${automationId}`,
+      buildScheduleAutomation({ id: automationId, scheduleEntityId, scheduleName: week.name.trim(), target }),
+    );
+  } catch (err) {
+    // Half a schedule (a helper that drives nothing) is worse than none.
+    await hass.callWS({ type: 'schedule/delete', schedule_id: created.id });
+    throw err;
+  }
+  if (labelName) {
+    const automation = await waitForEntity(
+      hass,
+      (e) => e.entity_id.startsWith('automation.') && String(e.attributes?.id) === automationId,
+      waitOptions,
+    );
+    await setModeMembership(hass, labelName, [scheduleEntityId, automation.entity_id], true);
+  }
+  return scheduleEntityId;
+}
+
+/**
+ * Deletes a schedule and the automations driving it that Beit wrote. Automations written by hand are left alone;
+ * their names are returned.
+ */
+export async function deleteSchedule(hass, scheduleEntityId) {
+  const kept = [];
+  for (const a of await automationsFor(hass, scheduleEntityId)) {
+    const cfg = await automationConfig(hass, a);
+    if (isOurs(cfg) && cfg?.id != null) await hass.callApi('DELETE', `config/automation/config/${cfg.id}`);
+    else kept.push(hass.states?.[a]?.attributes?.friendly_name || a);
+  }
+  await hass.callWS({ type: 'schedule/delete', schedule_id: scheduleEntityId.slice('schedule.'.length) });
+  return kept;
+}
+
+export const setAutomationEnabled = (hass, automationEntityId, enabled) =>
+  hass.callService('automation', enabled ? 'turn_on' : 'turn_off', {}, { entity_id: automationEntityId });
+
+// ---- modes: an HA label names the automations (and schedules) of a mode ----
+
+/** Labels and each entity's labels, read fresh from HA: `{labels, entityLabels: {entity_id: [label_id]}}`. */
+export async function loadRegistry(hass) {
+  const [labels, display] = await Promise.all([
+    hass.callWS({ type: 'config/label_registry/list' }),
+    hass.callWS({ type: 'config/entity_registry/list_for_display' }),
+  ]);
+  return { labels, entityLabels: Object.fromEntries(display.entities.map((e) => [e.ei, e.lb || []])), display };
+}
+
+export const labelNamed = (registry, name) => registry?.labels?.find((l) => l.name === name) || null;
+
+export async function ensureLabel(hass, name) {
+  const labels = await hass.callWS({ type: 'config/label_registry/list' });
+  const existing = labels.find((l) => l.name === name);
+  if (existing) return existing;
+  const style = MODE_LABEL_STYLE[name] || {};
+  return hass.callWS({ type: 'config/label_registry/create', name, ...style });
+}
+
+/**
+ * Adds the mode's label to (or removes it from) each entity. `config/entity_registry/update` replaces the whole
+ * list, so the entity's other labels are merged back in.
+ */
+export async function setModeMembership(hass, labelName, entityIds, member) {
+  const label = await ensureLabel(hass, labelName);
+  const { entityLabels } = await loadRegistry(hass);
+  for (const id of entityIds) {
+    const current = entityLabels[id] || [];
+    const next = member ? [...new Set([...current, label.label_id])] : current.filter((l) => l !== label.label_id);
+    if (next.length === current.length && next.every((l) => current.includes(l))) continue;
+    await hass.callWS({ type: 'config/entity_registry/update', entity_id: id, labels: next });
+  }
+  return label;
+}
+
+/** The entities of a mode, by name, sorted by their display name. */
+export function modeMembers(states, registry, labelName, domain = 'automation') {
+  const label = labelNamed(registry, labelName);
+  if (!label) return [];
+  return Object.values(states || {})
+    .filter((e) => e.entity_id.startsWith(`${domain}.`) && (registry.entityLabels[e.entity_id] || []).includes(label.label_id))
+    .sort((a, b) => entityName(a).localeCompare(entityName(b), 'he'));
+}
+
+/** Switches every automation of a mode on or off in one call. */
+export async function setModeEnabled(hass, registry, labelName, enabled) {
+  const members = modeMembers(hass.states, registry, labelName);
+  if (!members.length) return;
+  await hass.callService('automation', enabled ? 'turn_on' : 'turn_off', {}, { entity_id: members.map((m) => m.entity_id) });
+}
+
+// ---- automatic Shabbat ----
+
+/**
+ * The existing automatic-Shabbat automation, if any: `{entityId, config, ours}`. Recognised by its alias; one that
+ * carries the marker is preferred.
+ */
+export async function findAutoShabbat(hass) {
+  const candidates = Object.values(hass.states || {}).filter(
+    (e) => e.entity_id.startsWith('automation.') && e.attributes?.friendly_name === AUTO_SHABBAT_ALIAS,
+  );
+  let fallback = null;
+  for (const c of candidates) {
+    const config = await automationConfig(hass, c.entity_id).catch(() => null);
+    const found = { entityId: c.entity_id, config, ours: isOurs(config) };
+    if (found.ours) return found;
+    fallback ??= found;
+  }
+  return fallback;
+}
+
+/** Turns automatic Shabbat on: switches an existing one on, or creates the one automation. Never a second one. */
+export async function enableAutoShabbat(hass, { waitOptions } = {}) {
+  const existing = await findAutoShabbat(hass);
+  if (existing) {
+    if (hass.states?.[existing.entityId]?.state !== 'on') await setAutomationEnabled(hass, existing.entityId, true);
+    return existing.entityId;
+  }
+  const trigger = autoShabbatEndTrigger(findCalendar(hass.states));
+  if (!trigger) throw new Error(STRINGS.he.errNoCalendar);
+  const label = await ensureLabel(hass, 'שבת');
+  const id = String(Date.now());
+  await hass.callApi('POST', `config/automation/config/${id}`, buildAutoShabbatAutomation({ id, labelId: label.label_id, shabbatEndTrigger: trigger }));
+  const entity = await waitForEntity(hass, (e) => e.entity_id.startsWith('automation.') && String(e.attributes?.id) === id, waitOptions);
+  return entity.entity_id;
+}
+
+/** Turns automatic Shabbat off: deletes the automation if Beit wrote it, otherwise only switches it off. */
+export async function disableAutoShabbat(hass) {
+  const existing = await findAutoShabbat(hass);
+  if (!existing) return null;
+  if (existing.ours && existing.config?.id != null) {
+    await hass.callApi('DELETE', `config/automation/config/${existing.config.id}`);
+    return 'deleted';
+  }
+  await setAutomationEnabled(hass, existing.entityId, false);
+  return 'turned_off';
+}
+
+export const entityName = (st) => st?.attributes?.friendly_name || st?.entity_id || '';
+
 // ---------------------------------------------------------------------------- strings
 
 export const STRINGS = {
@@ -291,11 +528,13 @@ export const STRINGS = {
     errName: 'צריך שם לתזמון',
     errReversed: (day) => `ביום ${day}: שעת הסיום לפני שעת ההתחלה`,
     errOverlap: (day) => `ביום ${day}: יש טווחים חופפים`,
+    errNoCalendar: 'לא נמצא לוח שנה עברי (Jewish Calendar או Hebcal) — אין לפי מה לדעת מתי השבת יוצאת',
   },
   en: {
     errName: 'The schedule needs a name',
     errReversed: (day) => `${day}: a range ends before it starts`,
     errOverlap: (day) => `${day}: ranges overlap`,
+    errNoCalendar: 'No Jewish calendar found (Jewish Calendar or Hebcal), so there is no way to tell when Shabbat ends',
   },
 };
 

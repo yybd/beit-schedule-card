@@ -1,0 +1,80 @@
+[
+ {
+  "aliases": [],
+  "area_id": "living_room",
+  "floor_id": null,
+  "humidity_entity_id": null,
+  "icon": null,
+  "labels": [],
+  "name": "סלון",
+  "picture": null,
+  "temperature_entity_id": null,
+  "created_at": 0.0,
+  "modified_at": 0.0
+ },
+ {
+  "aliases": [],
+  "area_id": "bedroom",
+  "floor_id": null,
+  "humidity_entity_id": null,
+  "icon": null,
+  "labels": [],
+  "name": "חדר שינה",
+  "picture": null,
+  "temperature_entity_id": null,
+  "created_at": 0.0,
+  "modified_at": 0.0
+ },
+ {
+  "aliases": [],
+  "area_id": "kids_room",
+  "floor_id": null,
+  "humidity_entity_id": null,
+  "icon": null,
+  "labels": [],
+  "name": "חדר ילדים",
+  "picture": null,
+  "temperature_entity_id": null,
+  "created_at": 0.0,
+  "modified_at": 0.0
+ },
+ {
+  "aliases": [],
+  "area_id": "kitchen",
+  "floor_id": null,
+  "humidity_entity_id": null,
+  "icon": null,
+  "labels": [],
+  "name": "מטבח",
+  "picture": null,
+  "temperature_entity_id": null,
+  "created_at": 0.0,
+  "modified_at": 0.0
+ },
+ {
+  "aliases": [],
+  "area_id": "balcony",
+  "floor_id": null,
+  "humidity_entity_id": null,
+  "icon": null,
+  "labels": [],
+  "name": "מרפסת",
+  "picture": null,
+  "temperature_entity_id": null,
+  "created_at": 0.0,
+  "modified_at": 0.0
+ },
+ {
+  "aliases": [],
+  "area_id": "utility",
+  "floor_id": null,
+  "humidity_entity_id": null,
+  "icon": null,
+  "labels": [],
+  "name": "חדר שירות",
+  "picture": null,
+  "temperature_entity_id": null,
+  "created_at": 0.0,
+  "modified_at": 0.0
+ }
+]

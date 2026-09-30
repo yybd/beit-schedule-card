@@ -1,0 +1,191 @@
+{
+ "entity_categories": {
+  "0": "config",
+  "1": "diagnostic"
+ },
+ "entities": [
+  {
+   "ei": "climate.living_room_ac",
+   "pl": "demo",
+   "lb": [],
+   "di": "d_living_ac"
+  },
+  {
+   "ei": "climate.bedroom_ac",
+   "pl": "demo",
+   "lb": [],
+   "di": "d_bedroom_ac"
+  },
+  {
+   "ei": "climate.kids_ac",
+   "pl": "demo",
+   "lb": [],
+   "di": "d_kids_ac"
+  },
+  {
+   "ei": "light.balcony",
+   "pl": "demo",
+   "lb": [],
+   "di": "d_balcony_light"
+  },
+  {
+   "ei": "light.living_room",
+   "pl": "demo",
+   "lb": [],
+   "ai": "living_room"
+  },
+  {
+   "ei": "light.kitchen_strip",
+   "pl": "demo",
+   "lb": [],
+   "di": "d_kitchen_strip",
+   "ai": "kitchen"
+  },
+  {
+   "ei": "switch.hot_plate",
+   "pl": "demo",
+   "lb": [],
+   "di": "d_hot_plate"
+  },
+  {
+   "ei": "switch.night_light",
+   "pl": "demo",
+   "lb": [],
+   "di": "d_night_light"
+  },
+  {
+   "ei": "switch.living_room_ac_display",
+   "pl": "demo",
+   "lb": [],
+   "di": "d_living_ac",
+   "ec": 0
+  },
+  {
+   "ei": "water_heater.boiler",
+   "pl": "demo",
+   "lb": [],
+   "di": "d_boiler"
+  },
+  {
+   "ei": "cover.bedroom_shutter",
+   "pl": "demo",
+   "lb": [],
+   "di": "d_shutter"
+  },
+  {
+   "ei": "media_player.kitchen_speaker",
+   "pl": "demo",
+   "lb": [],
+   "di": "d_speaker"
+  },
+  {
+   "ei": "sensor.living_room_temperature",
+   "pl": "demo",
+   "lb": [],
+   "di": "d_living_ac",
+   "ec": 1
+  },
+  {
+   "ei": "schedule.living_room_ac_shabbat",
+   "pl": "schedule",
+   "lb": [
+    "shbt"
+   ]
+  },
+  {
+   "ei": "schedule.bedroom_ac_shabbat",
+   "pl": "schedule",
+   "lb": [
+    "shbt"
+   ]
+  },
+  {
+   "ei": "schedule.kids_ac_chag",
+   "pl": "schedule",
+   "lb": [
+    "khg"
+   ]
+  },
+  {
+   "ei": "schedule.water_heater_weekdays",
+   "pl": "schedule",
+   "lb": [
+    "energy"
+   ]
+  },
+  {
+   "ei": "schedule.balcony_light",
+   "pl": "schedule",
+   "lb": []
+  },
+  {
+   "ei": "schedule.hot_plate_shabbat",
+   "pl": "schedule",
+   "lb": [
+    "shbt"
+   ]
+  },
+  {
+   "ei": "schedule.pool_pump",
+   "pl": "schedule",
+   "lb": []
+  },
+  {
+   "ei": "automation.beit_living_room_ac_shabbat",
+   "pl": "automation",
+   "lb": [
+    "shbt"
+   ]
+  },
+  {
+   "ei": "automation.living_room_fan_shabbat",
+   "pl": "automation",
+   "lb": [
+    "shbt"
+   ]
+  },
+  {
+   "ei": "automation.beit_bedroom_ac_shabbat",
+   "pl": "automation",
+   "lb": [
+    "shbt"
+   ]
+  },
+  {
+   "ei": "automation.beit_hot_plate_shabbat",
+   "pl": "automation",
+   "lb": [
+    "shbt"
+   ]
+  },
+  {
+   "ei": "automation.beit_kids_ac_chag",
+   "pl": "automation",
+   "lb": [
+    "khg"
+   ]
+  },
+  {
+   "ei": "automation.beit_water_heater_weekdays",
+   "pl": "automation",
+   "lb": [
+    "energy"
+   ]
+  },
+  {
+   "ei": "automation.balcony_light_evening",
+   "pl": "automation",
+   "lb": []
+  },
+  {
+   "ei": "automation.pool_pump",
+   "pl": "automation",
+   "lb": []
+  },
+  {
+   "ei": "automation.morning_music",
+   "pl": "automation",
+   "lb": []
+  }
+ ]
+}

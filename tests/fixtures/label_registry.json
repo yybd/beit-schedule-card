@@ -1,0 +1,29 @@
+[
+ {
+  "label_id": "shbt",
+  "name": "שבת",
+  "icon": "mdi:candle",
+  "color": "amber",
+  "description": null,
+  "created_at": 0.0,
+  "modified_at": 0.0
+ },
+ {
+  "label_id": "khg",
+  "name": "חג",
+  "icon": "mdi:star-david",
+  "color": "indigo",
+  "description": null,
+  "created_at": 0.0,
+  "modified_at": 0.0
+ },
+ {
+  "label_id": "energy",
+  "name": "energy",
+  "icon": null,
+  "color": "green",
+  "description": null,
+  "created_at": 0.0,
+  "modified_at": 0.0
+ }
+]

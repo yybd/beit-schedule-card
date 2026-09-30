@@ -1,0 +1,112 @@
+[
+ {
+  "id": "d_living_ac",
+  "area_id": "living_room",
+  "name": "Living room AC",
+  "name_by_user": null,
+  "manufacturer": "Example",
+  "model": "Synthetic",
+  "labels": [],
+  "disabled_by": null,
+  "entry_type": null
+ },
+ {
+  "id": "d_bedroom_ac",
+  "area_id": "bedroom",
+  "name": "Bedroom AC",
+  "name_by_user": null,
+  "manufacturer": "Example",
+  "model": "Synthetic",
+  "labels": [],
+  "disabled_by": null,
+  "entry_type": null
+ },
+ {
+  "id": "d_kids_ac",
+  "area_id": "kids_room",
+  "name": "Kids AC",
+  "name_by_user": null,
+  "manufacturer": "Example",
+  "model": "Synthetic",
+  "labels": [],
+  "disabled_by": null,
+  "entry_type": null
+ },
+ {
+  "id": "d_balcony_light",
+  "area_id": "balcony",
+  "name": "Balcony light",
+  "name_by_user": null,
+  "manufacturer": "Example",
+  "model": "Synthetic",
+  "labels": [],
+  "disabled_by": null,
+  "entry_type": null
+ },
+ {
+  "id": "d_hot_plate",
+  "area_id": "kitchen",
+  "name": "Hot plate plug",
+  "name_by_user": null,
+  "manufacturer": "Example",
+  "model": "Synthetic",
+  "labels": [],
+  "disabled_by": null,
+  "entry_type": null
+ },
+ {
+  "id": "d_boiler",
+  "area_id": "utility",
+  "name": "Boiler",
+  "name_by_user": null,
+  "manufacturer": "Example",
+  "model": "Synthetic",
+  "labels": [],
+  "disabled_by": null,
+  "entry_type": null
+ },
+ {
+  "id": "d_shutter",
+  "area_id": "bedroom",
+  "name": "Bedroom shutter",
+  "name_by_user": null,
+  "manufacturer": "Example",
+  "model": "Synthetic",
+  "labels": [],
+  "disabled_by": null,
+  "entry_type": null
+ },
+ {
+  "id": "d_speaker",
+  "area_id": "kitchen",
+  "name": "Kitchen speaker",
+  "name_by_user": null,
+  "manufacturer": "Example",
+  "model": "Synthetic",
+  "labels": [],
+  "disabled_by": null,
+  "entry_type": null
+ },
+ {
+  "id": "d_night_light",
+  "area_id": "kids_room",
+  "name": "Night light",
+  "name_by_user": null,
+  "manufacturer": "Example",
+  "model": "Synthetic",
+  "labels": [],
+  "disabled_by": null,
+  "entry_type": null
+ },
+ {
+  "id": "d_kitchen_strip",
+  "area_id": null,
+  "name": "Kitchen LED strip",
+  "name_by_user": null,
+  "manufacturer": "Example",
+  "model": "Synthetic",
+  "labels": [],
+  "disabled_by": null,
+  "entry_type": null
+ }
+]
