@@ -32,10 +32,16 @@ export async function launchChrome({ port = 9339 } = {}) {
   const bin = process.env.CHROME || (existsSync(MAC_CHROME) ? MAC_CHROME : 'google-chrome');
   const profile = mkdtempSync(join(tmpdir(), 'beit-chrome-'));
   const args = ['--headless=new', `--remote-debugging-port=${port}`, '--hide-scrollbars', '--disable-gpu', `--user-data-dir=${profile}`];
-  if (process.env.CI) args.push('--no-sandbox'); // GitHub's runners do not allow Chrome's sandbox
-  const proc = spawn(bin, [...args, 'about:blank'], { stdio: 'ignore' });
+  // GitHub's runners do not allow Chrome's sandbox, and their /dev/shm is small.
+  if (process.env.CI) args.push('--no-sandbox', '--disable-dev-shm-usage');
+  const proc = spawn(bin, [...args, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+  let stderr = '';
+  let exited = null;
+  proc.stderr.on('data', (d) => (stderr = (stderr + d).slice(-4000)));
+  proc.on('error', (err) => (exited = String(err)));
+  proc.on('exit', (code) => (exited ??= `exit code ${code}`));
   let pages = [];
-  for (let i = 0; i < 100 && !pages.some((p) => p.type === 'page'); i++) {
+  for (let i = 0; i < 300 && !exited && !pages.some((p) => p.type === 'page'); i++) {
     try {
       pages = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
     } catch {
@@ -44,7 +50,10 @@ export async function launchChrome({ port = 9339 } = {}) {
     await sleep(100);
   }
   const target = pages.find((p) => p.type === 'page');
-  if (!target) throw new Error(`Chrome did not start (${bin})`);
+  if (!target) {
+    proc.kill();
+    throw new Error(`Chrome did not start (${bin}${exited ? `, ${exited}` : ', no answer in 30 s'})\n${stderr.trim().split('\n').slice(-15).join('\n')}`);
+  }
   const ws = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => {
     ws.onopen = resolve;
