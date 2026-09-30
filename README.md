@@ -188,7 +188,9 @@ old address). Dashboards that use `custom:beit-schedule-card` or `custom:beit-sh
 
 1. In HACS, remove *Beit Schedule Card* (or *Beit Weekly Schedule*), then add this repository again and download it.
    The file is now `schedule-helper-card.js`; HACS registers the new resource.
-2. Optionally, change your cards' types to `custom:schedule-helper-card` and `custom:schedule-helper-shabbat-card`.
+2. Check *Settings → Dashboards → ⋮ → Resources*: if `/hacsfiles/beit-schedule-card/beit-schedule-card.js` is still
+   listed, delete it (HACS may leave it behind, pointing at a file that is gone).
+3. Optionally, change your cards' types to `custom:schedule-helper-card` and `custom:schedule-helper-shabbat-card`.
 
 ## Configuration
 
