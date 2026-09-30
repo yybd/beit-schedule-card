@@ -55,6 +55,7 @@
     lang === 'he' ? link('lang', 'en', 'English') : link('lang', null, 'עברית'),
     q.get('theme') === 'dark' ? link('theme', null, 'light') : link('theme', 'dark', 'dark'),
     q.get('admin') === '0' ? link('admin', null, 'admin') : link('admin', '0', 'non-admin'),
+    q.get('editors') ? link('editors', null, 'hide editors') : link('editors', '1', 'visual editors'),
   ].join(' · ');
 
   const log = (m) => { const el = document.getElementById('log'); el.textContent = m + '\n' + el.textContent; };
@@ -67,7 +68,22 @@
   const configs = [JSON.parse(q.get('schedules') || '{}'), JSON.parse(q.get('shabbat') || '{}')];
   // HA calls setConfig more than once, and sets hass before and after: do the same here.
   cards.forEach((c, i) => { if (c.setConfig) { c.setConfig(configs[i]); c.hass = fake.snapshot(); c.setConfig(configs[i]); } });
-  const push = () => cards.forEach((c) => { if (c.setConfig) c.hass = fake.snapshot(); });
+  // The visual editors, wired as HA wires them: config-changed → card.setConfig, and the config echoed back.
+  const editors = [];
+  if (q.get('editors')) {
+    cards.forEach((card, i) => {
+      const ed = card.constructor.getConfigElement();
+      ed.hass = fake.snapshot();
+      ed.setConfig(configs[i]);
+      ed.addEventListener('config-changed', (e) => { log(`config ${JSON.stringify(e.detail.config)}`); card.setConfig(e.detail.config); ed.setConfig(e.detail.config); });
+      const box = document.createElement('ha-card');
+      box.style.padding = '16px';
+      box.appendChild(ed);
+      document.querySelector('.grid').appendChild(box);
+      editors.push(ed);
+    });
+  }
+  const push = () => [...cards, ...editors].forEach((c) => { if (c.setConfig) c.hass = fake.snapshot(); });
   fake.onChange(push);
   let seen = 0;
   setInterval(() => { for (; seen < fake.calls.length; seen++) log(JSON.stringify(fake.calls[seen])); }, 300);

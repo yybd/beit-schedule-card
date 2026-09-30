@@ -672,6 +672,20 @@ export const STRINGS = {
     calHavdalah: 'הבדלה',
     calInEffect: 'שבת / חג עכשיו',
     selfExcluded: 'אוטומציית השבת האוטומטית לא יכולה להיות חלק מהמצב — היא הייתה מכבה את עצמה.',
+    edGeneral: 'כללי',
+    edTitle: 'כותרת',
+    edShowAdd: 'כפתור "תזמון חדש"',
+    edShowModes: 'הצגת שבת וחג',
+    edShowModesHint: 'כבו אם אין צורך במצבי שבת וחג: הכרטיס לא יציג אותם.',
+    edModeFilter: 'הצגת תזמונים',
+    edAllSchedules: 'כל התזמונים',
+    edOnlyMode: (m) => `רק תזמוני ${m}`,
+    edSchedules: 'תזמונים בכרטיס',
+    edSchedulesHint: 'סמנו את התזמונים שיוצגו.',
+    edAll: 'הכול',
+    edNone: 'כלום',
+    edModes: 'מצבים',
+    edShowCalendar: 'הצגת זמני השבת והחג',
   },
   en: {
     errName: 'The schedule needs a name',
@@ -765,6 +779,20 @@ export const STRINGS = {
     calHavdalah: 'Havdalah',
     calInEffect: 'Shabbat / chag now',
     selfExcluded: 'The automatic-Shabbat automation cannot be part of the mode: it would switch itself off.',
+    edGeneral: 'General',
+    edTitle: 'Title',
+    edShowAdd: '"New schedule" button',
+    edShowModes: 'Show Shabbat and chag',
+    edShowModesHint: 'Turn off if you have no use for Shabbat and chag modes: the card will not show them.',
+    edModeFilter: 'Schedules shown',
+    edAllSchedules: 'All schedules',
+    edOnlyMode: (m) => `Only ${m} schedules`,
+    edSchedules: 'Schedules on the card',
+    edSchedulesHint: 'Tick the schedules to show.',
+    edAll: 'All',
+    edNone: 'None',
+    edModes: 'Modes',
+    edShowCalendar: 'Show Shabbat and chag times',
   },
 };
 
@@ -919,8 +947,16 @@ class BeitCardBase extends Base {
   }
 
   _toast(text, ms = 6000) {
-    const el = this._root().querySelector('.toast');
-    if (!el) return;
+    const root = this._root();
+    // A modal dialog sits in the top layer: a toast outside it would be hidden behind its backdrop.
+    const host = root.querySelector('dialog[open]') || root;
+    let el = host.querySelector(':scope > .toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'toast';
+      el.setAttribute('role', 'status');
+      host.appendChild(el);
+    }
     el.textContent = text;
     el.hidden = false;
     clearTimeout(this._toastTimer);
@@ -947,6 +983,10 @@ class BeitCardBase extends Base {
 class BeitScheduleCard extends BeitCardBase {
   static getStubConfig() {
     return { show_add: true };
+  }
+
+  static getConfigElement() {
+    return document.createElement('beit-schedule-card-editor');
   }
 
   setConfig(config) {
@@ -1467,7 +1507,11 @@ class ScheduleEditor {
     if (!f) return;
     if (f === 'auto') {
       const id = e.target.dataset.id;
-      this.card._run(() => setAutomationEnabled(this.card._h, id, e.target.checked));
+      // Back to what HA says, whether the call worked or not.
+      this.card._run(() => setAutomationEnabled(this.card._h, id, e.target.checked)).then(() => {
+        this._linkedSig = null;
+        this.renderLinked();
+      });
       return;
     }
     if (f === 'copyDay') {
@@ -1708,6 +1752,10 @@ export function calendarRows(states, cal, lang = 'he', now = new Date()) {
 class BeitShabbatCard extends BeitCardBase {
   static getStubConfig() {
     return { modes: [...MODES], show_calendar: true };
+  }
+
+  static getConfigElement() {
+    return document.createElement('beit-shabbat-card-editor');
   }
 
   setConfig(config) {
@@ -1993,11 +2041,156 @@ const SHABBAT_STYLE = `
   .check-row .grow span:first-child { font-size: 15px; }
 `;
 
+// ---------------------------------------------------------------------------- visual config editors
+
+/** Shared by both editors: HA echoes our own config-changed back through setConfig; re-rendering then would steal focus. */
+class BeitEditorBase extends Base {
+  setConfig(config) {
+    if (this._emitted && JSON.stringify(config) === this._emitted) return;
+    this._config = { ...config };
+    this._render();
+  }
+
+  set hass(hass) {
+    const first = !this._hass;
+    this._hass = hass;
+    if (first) this._render();
+  }
+
+  get _t() {
+    return STRINGS[langOf(this._hass)];
+  }
+
+  _emit(config) {
+    for (const [k, v] of Object.entries(config)) {
+      if (v === '' || v === undefined || (Array.isArray(v) && !v.length && k !== 'modes')) delete config[k];
+    }
+    this._config = config;
+    this._emitted = JSON.stringify(config);
+    this.dispatchEvent(new CustomEvent('config-changed', { detail: { config }, bubbles: true, composed: true }));
+  }
+
+  _shell(inner) {
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+    this.shadowRoot.innerHTML = `<style>${CONFIG_EDITOR_STYLE}</style><div class="ed" dir="${langOf(this._hass) === 'he' ? 'rtl' : 'ltr'}">${inner}</div>`;
+    return this.shadowRoot;
+  }
+}
+
+class BeitScheduleCardEditor extends BeitEditorBase {
+  _render() {
+    if (!this._config) return;
+    const t = this._t;
+    const c = this._config;
+    const showModes = c.show_modes !== false;
+    const schedules = Object.values(this._hass?.states || {})
+      .filter((e) => e.entity_id.startsWith('schedule.'))
+      .sort((a, b) => entityName(a).localeCompare(entityName(b), langOf(this._hass)));
+    const whitelist = Array.isArray(c.entities);
+    const shown = (id) => (whitelist ? c.entities.includes(id) : !(c.hide_entities || []).includes(id));
+    const root = this._shell(`
+      <section>
+        <h3>${esc(t.edGeneral)}</h3>
+        <label class="field"><span>${esc(t.edTitle)}</span><input data-key="title" value="${esc(c.title ?? '')}" placeholder="${esc(t.schedules)}"></label>
+        <label class="chk"><input type="checkbox" data-bool="show_add" ${c.show_add !== false ? 'checked' : ''}><span>${esc(t.edShowAdd)}</span></label>
+        <label class="chk"><input type="checkbox" data-bool="show_modes" ${showModes ? 'checked' : ''}><span>${esc(t.edShowModes)}</span></label>
+        <p class="hint">${esc(t.edShowModesHint)}</p>
+        ${showModes ? `<label class="field"><span>${esc(t.edModeFilter)}</span><select data-key="mode">
+          <option value="" ${!c.mode ? 'selected' : ''}>${esc(t.edAllSchedules)}</option>
+          ${MODES.map((m) => `<option value="${esc(m)}" ${c.mode === m ? 'selected' : ''}>${esc(t.edOnlyMode(t.modeName[m]))}</option>`).join('')}
+        </select></label>` : ''}
+      </section>
+      <section>
+        <h3>${esc(t.edSchedules)}</h3>
+        <p class="hint">${esc(t.edSchedulesHint)}</p>
+        <div class="actions"><button data-all>${esc(t.edAll)}</button><button data-none>${esc(t.edNone)}</button></div>
+        <div class="list">${schedules.map((e) => `<label class="chk row"><input type="checkbox" data-schedule="${esc(e.entity_id)}" ${shown(e.entity_id) ? 'checked' : ''}>
+          <span>${esc(entityName(e))}</span><small dir="ltr">${esc(e.entity_id)}</small></label>`).join('') || `<div class="hint">${esc(t.noSchedules)}</div>`}</div>
+      </section>`);
+    root.querySelectorAll('[data-key]').forEach((el) => el.addEventListener('change', () => this._emit({ ...this._config, [el.dataset.key]: el.value.trim() })));
+    root.querySelectorAll('[data-bool]').forEach((el) => el.addEventListener('change', () => {
+      const config = { ...this._config, [el.dataset.bool]: el.checked };
+      if (el.dataset.bool === 'show_modes' && !el.checked) delete config.mode;
+      if (el.checked) delete config[el.dataset.bool]; // both default to true
+      this._emit(config);
+      if (el.dataset.bool === 'show_modes') this._render();
+    }));
+    root.querySelector('.list').addEventListener('change', () => this._saveSchedules());
+    root.querySelector('[data-all]').addEventListener('click', () => this._setAll(true));
+    root.querySelector('[data-none]').addEventListener('click', () => this._setAll(false));
+  }
+
+  _setAll(on) {
+    this.shadowRoot.querySelectorAll('[data-schedule]').forEach((b) => (b.checked = on));
+    this._saveSchedules();
+  }
+
+  _saveSchedules() {
+    const boxes = [...this.shadowRoot.querySelectorAll('[data-schedule]')];
+    const config = { ...this._config };
+    if (Array.isArray(config.entities)) config.entities = boxes.filter((b) => b.checked).map((b) => b.dataset.schedule);
+    else config.hide_entities = boxes.filter((b) => !b.checked).map((b) => b.dataset.schedule);
+    this._emit(config);
+  }
+}
+
+class BeitShabbatCardEditor extends BeitEditorBase {
+  _render() {
+    if (!this._config) return;
+    const t = this._t;
+    const c = this._config;
+    const modes = c.modes || MODES;
+    const root = this._shell(`
+      <section>
+        <h3>${esc(t.edGeneral)}</h3>
+        <label class="field"><span>${esc(t.edTitle)}</span><input data-key="title" value="${esc(c.title ?? '')}" placeholder="${esc(t.shabbatAndChag)}"></label>
+        <label class="chk"><input type="checkbox" data-bool="show_calendar" ${c.show_calendar !== false ? 'checked' : ''}><span>${esc(t.edShowCalendar)}</span></label>
+      </section>
+      <section>
+        <h3>${esc(t.edModes)}</h3>
+        ${MODES.map((m) => `<label class="chk"><input type="checkbox" data-mode="${esc(m)}" ${modes.includes(m) ? 'checked' : ''}><span>${MODE_GLYPH[m]} ${esc(t.modeTitle(t.modeName[m]))}</span></label>`).join('')}
+      </section>`);
+    root.querySelector('[data-key]').addEventListener('change', (e) => this._emit({ ...this._config, title: e.target.value.trim() }));
+    root.querySelector('[data-bool]').addEventListener('change', (e) => {
+      const config = { ...this._config, show_calendar: e.target.checked };
+      if (e.target.checked) delete config.show_calendar;
+      this._emit(config);
+    });
+    root.querySelectorAll('[data-mode]').forEach((el) => el.addEventListener('change', () => {
+      const chosen = [...root.querySelectorAll('[data-mode]')].filter((b) => b.checked).map((b) => b.dataset.mode);
+      this._emit({ ...this._config, modes: chosen });
+    }));
+  }
+}
+
+const CONFIG_EDITOR_STYLE = `
+  .ed { display: flex; flex-direction: column; gap: 18px; color: var(--primary-text-color); font-size: 14px; }
+  section { display: flex; flex-direction: column; gap: 8px; }
+  h3 { margin: 0; font-size: 15px; font-weight: 600; }
+  .hint, small { color: var(--secondary-text-color); font-size: 12px; margin: 0; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field span { font-size: 12px; color: var(--secondary-text-color); }
+  .field input, .field select { font: inherit; color: inherit; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--divider-color);
+    background: var(--card-background-color, transparent); }
+  .chk { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .chk input { width: 16px; height: 16px; margin: 0; accent-color: var(--primary-color); flex: none; }
+  .chk span { flex: 1; min-width: 0; }
+  .list { display: flex; flex-direction: column; max-height: 280px; overflow-y: auto; border: 1px solid var(--divider-color); border-radius: 10px; }
+  .row { padding: 7px 10px; border-bottom: 1px solid var(--divider-color); }
+  .row:last-child { border-bottom: 0; }
+  .actions { display: flex; gap: 12px; }
+  .actions button { font: inherit; font-size: 12px; color: var(--primary-color); background: none; border: 0; padding: 0; cursor: pointer; }
+`;
+
+export { BeitScheduleCardEditor, BeitShabbatCardEditor };
+
 export { BeitScheduleCard, BeitShabbatCard, BeitCardBase };
 
 if (typeof customElements !== 'undefined') {
   if (!customElements.get('beit-schedule-card')) customElements.define('beit-schedule-card', BeitScheduleCard);
   if (!customElements.get('beit-shabbat-card')) customElements.define('beit-shabbat-card', BeitShabbatCard);
+  if (!customElements.get('beit-schedule-card-editor')) customElements.define('beit-schedule-card-editor', BeitScheduleCardEditor);
+  if (!customElements.get('beit-shabbat-card-editor')) customElements.define('beit-shabbat-card-editor', BeitShabbatCardEditor);
   window.customCards = window.customCards || [];
   if (!window.customCards.some((c) => c.type === 'beit-schedule-card')) {
     window.customCards.push({
