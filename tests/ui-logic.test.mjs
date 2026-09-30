@@ -51,10 +51,11 @@ test('actionOptions per device', () => {
   const ac = actionOptions(states['climate.kids_ac']);
   assert.deepEqual(ac.hvacModes, ['cool', 'heat']);
   assert.equal(ac.defaultHvac, 'cool');
-  assert.deepEqual(ac.temp, { min: 17, max: 30, initial: 25 });
+  assert.deepEqual(ac.temp, { min: 17, max: 30, step: 1, initial: 25 });
   assert.equal(actionOptions(states['light.balcony']).brightness, true);
   assert.equal(actionOptions(states['light.kitchen_strip']).brightness, false);
-  assert.deepEqual(actionOptions(states['water_heater.boiler']).temp, { min: 40, max: 75, initial: 55 });
+  assert.deepEqual(actionOptions(states['water_heater.boiler']).temp, { min: 40, max: 75, step: 1, initial: 55 });
+  assert.equal(actionOptions({ entity_id: 'climate.x', attributes: { target_temp_step: 0.5, temperature: 21.5 } }).temp.step, 0.5);
   assert.equal(actionOptions(states['switch.hot_plate']).temp, null);
 });
 
@@ -108,4 +109,13 @@ test('deviceSections honours the card device_domains and the picker type chip', 
   assert.deepEqual(ids({ ...data, only: 'climate' }), ['climate.bedroom_ac', 'climate.kids_ac', 'climate.living_room_ac']);
   assert.deepEqual(ids({ ...data, domains: ['light'], only: 'climate' }), []);
   assert.equal(ids({ ...data, domains: [] }).length, ids(data).length, 'an empty list means all');
+});
+
+import { actionSummary } from '../dist/beit-schedule-card.js';
+
+test('actionSummary says what a schedule does to its device', () => {
+  assert.equal(actionSummary({ entityId: 'climate.a', hvacMode: 'cool', temperature: 24 }), 'בתחילת הטווח: נדלק (קירור, 24°) · בסופו: נכבה');
+  assert.equal(actionSummary({ entityId: 'cover.c' }), 'בתחילת הטווח: נפתח · בסופו: נסגר');
+  assert.equal(actionSummary({ entityId: 'light.l', brightnessPct: 40, turnOffAtEnd: false }), 'בתחילת הטווח: נדלק (40%) · בסופו: נשאר כמו שהוא');
+  assert.equal(actionSummary({ entityId: 'switch.s' }, 'en'), 'When a range starts: turns on · when it ends: turns off');
 });

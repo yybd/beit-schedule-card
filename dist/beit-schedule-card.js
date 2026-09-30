@@ -534,12 +534,17 @@ export async function createScheduleWithAutomation(hass, week, target, { labelNa
     throw err;
   }
   if (labelName) {
-    const automation = await waitForEntity(
-      hass,
-      (e) => e.entity_id.startsWith('automation.') && String(e.attributes?.id) === automationId,
-      waitOptions,
-    );
-    await setModeMembership(hass, labelName, [scheduleEntityId, automation.entity_id], true);
+    try {
+      const automation = await waitForEntity(
+        hass,
+        (e) => e.entity_id.startsWith('automation.') && String(e.attributes?.id) === automationId,
+        waitOptions,
+      );
+      await setModeMembership(hass, labelName, [scheduleEntityId, automation.entity_id], true);
+    } catch (err) {
+      // The schedule and its automation exist: saving again would make a second pair.
+      throw Object.assign(err instanceof Error ? err : new Error(errorText(err)), { created: scheduleEntityId });
+    }
   }
   return scheduleEntityId;
 }
@@ -782,13 +787,40 @@ export function deviceSections({ states, display, devices = [], areas = [], doma
     .filter((sec) => sec.entities.length);
 }
 
+const VERBS = {
+  he: { on: 'נדלק', open: 'נפתח', close: 'נסגר', off: 'נכבה', pause: 'מושהה', stays: 'נשאר כמו שהוא', play: 'מופעל' },
+  en: { on: 'turns on', open: 'opens', close: 'closes', off: 'turns off', pause: 'pauses', stays: 'stays as it is', play: 'turns on' },
+};
+
+/** "בתחילת הטווח: נדלק (קירור, 24°) · בסופו: נכבה": what a target does, in words. */
+export function actionSummary(target, lang = 'he') {
+  const t = STRINGS[lang];
+  const v = VERBS[lang];
+  const domain = domainOf(target.entityId);
+  const details = [
+    target.hvacMode && domain === 'climate' ? t.hvac[target.hvacMode] || target.hvacMode : null,
+    given(target.temperature) ? `${target.temperature}°` : null,
+    given(target.brightnessPct) ? `${target.brightnessPct}%` : null,
+  ].filter(Boolean);
+  const start = (domain === 'cover' || domain === 'valve' ? v.open : domain === 'media_player' ? v.play : v.on) +
+    (details.length ? ` (${details.join(', ')})` : '');
+  const end = target.turnOffAtEnd === false ? v.stays
+    : domain === 'cover' || domain === 'valve' ? v.close : domain === 'media_player' ? v.pause : v.off;
+  return `${t.atStart}: ${start} · ${t.atEnd}: ${end}`;
+}
+
 /** What the editor offers for a device: HVAC modes, a temperature range, brightness. */
 export function actionOptions(st) {
   const domain = domainOf(st.entity_id);
   const a = st.attributes || {};
   const hvacModes = domain === 'climate' ? (a.hvac_modes || []).filter((m) => m !== 'off') : [];
   const temp = domain === 'climate' || domain === 'water_heater'
-    ? { min: Number(a.min_temp ?? 16), max: Number(a.max_temp ?? 30), initial: Number(a.temperature ?? Math.round(((a.min_temp ?? 16) + (a.max_temp ?? 30)) / 2)) }
+    ? {
+      min: Number(a.min_temp ?? 16),
+      max: Number(a.max_temp ?? 30),
+      step: Number(a.target_temp_step) > 0 ? Number(a.target_temp_step) : 1,
+      initial: Number(a.temperature ?? Math.round(((a.min_temp ?? 16) + (a.max_temp ?? 30)) / 2)),
+    }
     : null;
   const brightness = domain === 'light' && (a.supported_color_modes || []).some((m) => m !== 'onoff');
   return { domain, hvacModes, defaultHvac: hvacModes.includes('cool') ? 'cool' : hvacModes[0] ?? null, temp, brightness };
@@ -884,9 +916,15 @@ export const STRINGS = {
     noAutomations: 'לא נמצאו אוטומציות',
     autoShabbat: 'שבת אוטומטית',
     autoTitle: { שבת: 'שבת אוטומטית', חג: 'חג אוטומטי' },
-    autoHint: (mode, start) => (mode === 'שבת'
-      ? `מדליק את מצב השבת בשישי ${start}, ומכבה אחרי צאת השבת כשכל תזמוני השבת הסתיימו.`
-      : `מדליק את מצב החג בערב חג ${start}, ומכבה אחרי צאת החג כשכל תזמוני החג הסתיימו. חג שחל בשבת מכוסה במצב שבת.`),
+    autoHint: (mode) => (mode === 'שבת'
+      ? 'מדליק את מצב השבת בשישי, לפני התזמונים, ומכבה אחרי צאת השבת כשכל תזמוני השבת הסתיימו.'
+      : 'מדליק את מצב החג בערב חג, לפני התזמונים, ומכבה אחרי צאת החג כשכל תזמוני החג הסתיימו. חג שחל בשבת מכוסה במצב שבת.'),
+    saved: 'התזמון נשמר',
+    createdPartly: (e) => `התזמון והאוטומציה נוצרו, אבל השלב האחרון נכשל: ${e}. פתחו את התזמון כדי לבדוק את הסוג שלו.`,
+    created: 'התזמון נוצר',
+    namePlaceholder: 'יתמלא משם המכשיר',
+    atStart: 'בתחילת הטווח',
+    atEnd: 'בסופו',
     startLabel: 'התחלה',
     change: 'שינוי',
     startAtLabel: 'בשעה',
@@ -1009,9 +1047,15 @@ export const STRINGS = {
     noAutomations: 'No automations found',
     autoShabbat: 'Automatic Shabbat',
     autoTitle: { שבת: 'Automatic Shabbat', חג: 'Automatic chag' },
-    autoHint: (mode, start) => (mode === 'שבת'
-      ? `Turns Shabbat mode on on Friday ${start}, and off after Shabbat ends once every Shabbat schedule has finished.`
-      : `Turns chag mode on on erev chag ${start}, and off after the chag ends once every chag schedule has finished. A chag on Shabbat is covered by Shabbat mode.`),
+    autoHint: (mode) => (mode === 'שבת'
+      ? 'Turns Shabbat mode on on Friday, before its schedules, and off after Shabbat ends once every Shabbat schedule has finished.'
+      : 'Turns chag mode on on erev chag, before its schedules, and off after the chag ends once every chag schedule has finished. A chag on Shabbat is covered by Shabbat mode.'),
+    saved: 'Schedule saved',
+    createdPartly: (e) => `The schedule and its automation were created, but the last step failed: ${e}. Open the schedule to check its type.`,
+    created: 'Schedule created',
+    namePlaceholder: "Filled in from the device's name",
+    atStart: 'When a range starts',
+    atEnd: 'when it ends',
     startLabel: 'Starts',
     change: 'Change',
     startAtLabel: 'At',
@@ -1203,6 +1247,15 @@ class BeitCardBase extends Base {
     this._render(true);
   }
 
+  /** HA replaces hass.entities when the registry changes; a label id we have not seen means a label was created. */
+  _checkLabels() {
+    const ents = this._hass?.entities;
+    if (!ents || ents === this._entitiesSeen || !this._labels) return;
+    this._entitiesSeen = ents;
+    const known = new Set(this._labels.map((l) => l.label_id));
+    if (Object.values(ents).some((e) => (e.labels || []).some((l) => !known.has(l)))) this._loadLabels();
+  }
+
   _modeOf(entityId, reg = this._registry()) {
     const own = reg.entityLabels[entityId] || [];
     return MODES.find((m) => {
@@ -1284,7 +1337,10 @@ class BeitScheduleCard extends BeitCardBase {
     if (first) {
       this._loadLabels();
       this._loadWeeks();
-    } else if (this._weeksSig !== this._scheduleSig()) this._loadWeeks();
+    } else {
+      this._checkLabels();
+      if (this._weeksSig !== this._scheduleSig()) this._loadWeeks();
+    }
     this._render();
     this._editor?.onHass();
   }
@@ -1308,6 +1364,9 @@ class BeitScheduleCard extends BeitCardBase {
 
   disconnectedCallback() {
     clearInterval(this._clock);
+    // A dialog removed from the page leaves the top layer without a close event.
+    this._editor?.dlg?.close();
+    this._editor?.destroy();
   }
 
   // Which schedule entities changed, cheaply: their last_updated.
@@ -1421,9 +1480,21 @@ class BeitScheduleCard extends BeitCardBase {
     if (row) this._openEditor(row.dataset.id);
   }
 
-  _openEditor(entityId) {
-    if (!this._isAdmin || this._editor) return;
-    if (entityId && !this._weeks?.[entityId.slice('schedule.'.length)]) return;
+  async _openEditor(entityId) {
+    if (!this._isAdmin || this._editor || this._opening) return;
+    if (entityId) {
+      // The week may have changed elsewhere without touching the entity's state: edit what HA has now.
+      this._opening = true;
+      try {
+        this._weeks = await listSchedules(this._h);
+      } catch {
+        /* the cached copy will do */
+      } finally {
+        this._opening = false;
+      }
+      this._render(true);
+      if (!this._weeks?.[entityId.slice('schedule.'.length)] || this._editor) return;
+    }
     this._editor = new ScheduleEditor(this, entityId);
     this._editor.open();
   }
@@ -1515,8 +1586,8 @@ class ScheduleEditor {
     if (this.isNew) {
       this.card._pickerData().then((d) => { this.picker = d; if (this.view === 'picker') this.render(); }, (err) => { this.error = errorText(err); this.render(); });
     } else {
-      automationsFor(this.card._h, this.entityId).then(
-        (a) => { this.automations = a; this.renderLinked(); this.loadDriven(a); },
+      this.automationsReady = automationsFor(this.card._h, this.entityId).then(
+        (a) => { this.automations = a; this.renderLinked(); return this.loadDriven(a); },
         () => { this.automations = []; this.renderLinked(); },
       );
     }
@@ -1561,6 +1632,7 @@ class ScheduleEditor {
   }
 
   close() {
+    if (this.saving) return; // the result has to be seen
     if (this.dlg?.open) this.dlg.close();
     else this.destroy();
   }
@@ -1590,6 +1662,11 @@ class ScheduleEditor {
 
   render() {
     if (!this.dlg) return;
+    // What is typed in an open range panel survives a redraw (e.g. the late "What it does" section).
+    if (this.rangeEdit && this._panelFor === this.rangeEdit && this.dlg.querySelector('#from')) {
+      this.rangeEdit.from = this.dlg.querySelector('#from').value;
+      this.rangeEdit.to = this.dlg.querySelector('#to').value;
+    }
     const t = this.t;
     const root = this.card._root();
     const focusKey = root.activeElement?.dataset?.focus;
@@ -1598,7 +1675,7 @@ class ScheduleEditor {
     this.dlg.setAttribute('dir', this.card._dirAttr());
     const title = this.view === 'picker' ? t.chooseDevice : this.isNew ? t.newSchedule : t.editSchedule;
     const head = this.view === 'main'
-      ? `<button class="icon-btn" data-act="close" aria-label="${esc(t.close)}" data-focus="close">${icon('close')}</button>
+      ? `<button class="icon-btn" data-act="close" aria-label="${esc(t.close)}" data-focus="close" ${this.saving ? 'disabled' : ''}>${icon('close')}</button>
          <h3 id="dlg-title">${esc(title)}</h3>
          ${this.isNew ? '' : `<button class="icon-btn" data-act="askDelete" aria-label="${esc(t.delete)}" title="${esc(t.delete)}" ${this.saving ? 'disabled' : ''}>${icon('delete')}</button>`}
          <button class="btn primary" data-act="save" ${this.saving ? 'disabled' : ''}>${this.saving ? '<span class="spinner"></span>' : ''}${esc(t.save)}</button>`
@@ -1607,6 +1684,16 @@ class ScheduleEditor {
     this.dlg.innerHTML = `<div class="dlg-head">${head}</div><div class="dlg-body">${body}</div>`;
     const again = this.dlg.querySelector('.dlg-body');
     if (this.view === 'main') again.scrollTop = scrollTop;
+    // A panel that just opened (or an error in it) takes the focus and scrolls into view with its day.
+    if (this.focusPanel) {
+      this.focusPanel = false;
+      const panel = this.dlg.querySelector('.panel');
+      panel?.closest('.day')?.scrollIntoView({ block: 'nearest' });
+      const field = panel?.querySelector('[data-autofocus]');
+      field?.focus();
+      field?.select?.();
+      return;
+    }
     const focus = (focusKey && this.dlg.querySelector(`[data-focus="${focusKey}"]`)) || this.dlg.querySelector('[data-autofocus]');
     focus?.focus();
   }
@@ -1616,8 +1703,10 @@ class ScheduleEditor {
     const seg = [[null, t.regular, ''], ...MODES.map((m) => [m, t.modeName[m], MODE_GLYPH[m]])];
     return `
       ${this.error ? `<div class="error" role="alert">${icon('alert')}<span>${esc(this.error)}</span></div>` : ''}
+      ${this.isNew ? this.targetHtml() : ''}
       <label class="field"><span>${esc(t.name)}</span>
-        <input id="name" data-focus="name" value="${esc(this.week.name)}" autocomplete="off" ${this.isNew ? '' : ''}></label>
+        <input id="name" data-focus="name" value="${esc(this.week.name)}" autocomplete="off"
+          ${this.isNew ? `placeholder="${esc(t.namePlaceholder)}"` : ''}></label>
       ${this.card._config.show_modes === false ? '' : `<div class="section">
         <div class="label">${esc(t.type)}</div>
         <div class="seg" role="radiogroup" aria-label="${esc(t.type)}">
@@ -1626,7 +1715,7 @@ class ScheduleEditor {
         </div>
         ${this.mode ? `<div class="muted small">${esc(t.modeHint(t.modeName[this.mode]))}</div>` : ''}
       </div>`}
-      ${this.isNew ? this.targetHtml() : `<div class="section linked">${this.linkedHtml()}</div>
+      ${this.isNew ? '' : `<div class="section linked">${this.linkedHtml()}</div>
         ${this.driven ? this.targetHtml(t.whatItDoes) : this.handEdited ? `<div class="muted small">${esc(t.handEdited)}</div>` : ''}`}
       <div class="section">
         <div class="label row-between"><span>${esc(t.hours)}</span>
@@ -1661,6 +1750,7 @@ class ScheduleEditor {
           ${this.brightness != null ? `<input type="range" min="1" max="100" value="${this.brightness}" data-field="brightness" data-focus="brightness"
             aria-label="${esc(t.brightness)}"><b class="bval">${this.brightness}%</b>` : ''}</div>`;
       }
+      options += `<div class="muted small summary">${esc(actionSummary(this.currentTarget(), this.lang))}</div>`;
       options += `<div class="opt"><span>${esc(o.domain === 'cover' ? t.closeAtEnd : t.turnOffAtEnd)}</span><span class="spacer"></span>
         ${switchHtml({ checked: this.turnOffAtEnd, label: o.domain === 'cover' ? t.closeAtEnd : t.turnOffAtEnd, attrs: 'data-field="turnOff" data-focus="turnOff"' })}</div>`;
     }
@@ -1712,13 +1802,14 @@ class ScheduleEditor {
         class="x" data-act="remove" data-day="${i}" data-index="${k}" aria-label="${esc(`${t.removeRange} ${blockLabel(b)}`)}">${icon('close')}</button></span>`).join('');
     let panel = '';
     if (this.rangeEdit?.day === i) {
+      this._panelFor = this.rangeEdit;
       const b = this.rangeEdit.index != null ? blocks[this.rangeEdit.index] : { start: 8 * 60, end: 9 * 60 };
       panel = `<div class="panel" role="group" aria-label="${esc(t.editRange)}">
         <div class="times" dir="ltr">
-          <label><span>${esc(t.from)}</span><input type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="HH:MM" id="from"
+          <label><span>${esc(t.from)}</span><input type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="HH:MM" id="from" data-focus="from"
             value="${esc(this.rangeEdit.from ?? hm(b.start))}" data-autofocus></label>
           <span aria-hidden="true">–</span>
-          <label><span>${esc(t.to)}</span><input type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="HH:MM" id="to"
+          <label><span>${esc(t.to)}</span><input type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="HH:MM" id="to" data-focus="to"
             value="${esc(this.rangeEdit.to ?? hm(b.end))}"></label>
         </div>
         ${this.rangeEdit.error ? `<div class="error small" role="alert">${esc(this.rangeEdit.error)}</div>` : ''}
@@ -1820,12 +1911,14 @@ class ScheduleEditor {
       case 'domain': this.domainFilter = el.dataset.v || null; break;
       case 'temp': {
         const o = actionOptions(this.device);
-        this.temperature = Math.min(o.temp.max, Math.max(o.temp.min, Math.round(this.temperature + Number(el.dataset.v))));
+        const step = o.temp.step;
+        const next = Math.round((this.temperature + Number(el.dataset.v) * step) / step) * step;
+        this.temperature = Math.min(o.temp.max, Math.max(o.temp.min, Number(next.toFixed(1))));
         break;
       }
       case 'clear': for (const d of DAYS) w.days[d] = []; this.rangeEdit = this.copyFrom = null; break;
-      case 'add': this.rangeEdit = { day, index: null }; this.copyFrom = null; break;
-      case 'edit': this.rangeEdit = { day, index }; this.copyFrom = null; break;
+      case 'add': this.rangeEdit = { day, index: null }; this.copyFrom = null; this.focusPanel = true; break;
+      case 'edit': this.rangeEdit = { day, index }; this.copyFrom = null; this.focusPanel = true; break;
       case 'remove': w.days[DAYS[day]] = w.days[DAYS[day]].filter((_, k) => k !== index); this.rangeEdit = null; break;
       case 'rangeCancel': this.rangeEdit = null; break;
       case 'rangeOk': {
@@ -1837,10 +1930,12 @@ class ScheduleEditor {
         if (end === 0) end = 1440; // "until midnight"
         if (start == null || end == null || start >= 1440) {
           this.rangeEdit.error = this.t.errTime;
+          this.focusPanel = true;
           break;
         }
         if (end <= start) {
           this.rangeEdit.error = this.t.errRange;
+          this.focusPanel = true;
           break;
         }
         const d = DAYS[this.rangeEdit.day];
@@ -1850,7 +1945,7 @@ class ScheduleEditor {
         this.rangeEdit = null;
         break;
       }
-      case 'copyOpen': this.copyFrom = { day, chosen: new Set() }; this.rangeEdit = null; break;
+      case 'copyOpen': this.copyFrom = { day, chosen: new Set() }; this.rangeEdit = null; this.focusPanel = true; break;
       case 'copyPreset': for (const k of el.dataset.v === 'weekdays' ? [0, 1, 2, 3, 4] : [0, 1, 2, 3, 4, 5, 6]) this.copyFrom.chosen.add(k); break;
       case 'copyCancel': this.copyFrom = null; break;
       case 'copyOk': {
@@ -1933,6 +2028,7 @@ class ScheduleEditor {
       if (this.isNew) {
         await createScheduleWithAutomation(h, this.week, this.currentTarget(), { labelName: this.mode });
       } else {
+        await this.automationsReady; // mode and rename need the linked automations
         await updateSchedule(h, this.id, this.week);
         if (this.driven) await rewriteScheduleAutomation(h, this.driven.config, { scheduleName: this.week.name, target: this.currentTarget() });
         await renameScheduleAutomations(h, this.automations || [], this.originalName, this.week.name);
@@ -1946,11 +2042,21 @@ class ScheduleEditor {
           }
         }
       }
+      this.saving = false;
       this.card._afterWrite();
       this.close();
+      this.card._toast(this.isNew ? t.created : t.saved, 3000);
     } catch (err) {
       this.saving = false;
+      if (err?.created) {
+        // The schedule and its automation were created; only a later step failed. Saving again would duplicate them.
+        this.card._afterWrite();
+        this.close();
+        this.card._toast(t.createdPartly(errorText(err)), 12000);
+        return;
+      }
       this.error = t.saveFailed(errorText(err));
+      if (!this.dlg?.isConnected) return this.card._toast(this.error, 12000); // closed meanwhile (e.g. Escape twice)
       this.render();
       this.dlg.querySelector('.dlg-body').scrollTop = 0;
     }
@@ -1962,12 +2068,14 @@ class ScheduleEditor {
     this.render();
     try {
       const kept = await deleteSchedule(this.card._h, this.entityId);
+      this.saving = false;
       this.card._afterWrite();
       this.close();
       if (kept.length) this.card._toast(t.kept(kept.join(', ')), 12000);
     } catch (err) {
       this.saving = false;
       this.error = t.deleteFailed(errorText(err));
+      if (!this.dlg?.isConnected) return this.card._toast(this.error, 12000);
       this.render();
     }
   }
@@ -2004,6 +2112,7 @@ const EDITOR_STYLE = `
     border: 1px dashed var(--divider-color); background: transparent; color: var(--primary-color); font-size: 14px; }
   .device .dname { color: var(--primary-text-color); font-weight: 500; }
   .opt { display: flex; align-items: center; gap: 8px; min-height: 40px; }
+  .summary { padding: 2px 0; }
   .opt input[type=range] { flex: 1; accent-color: var(--primary-color); }
   .grow, .spacer { flex: 1; min-width: 0; }
   .check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
@@ -2124,6 +2233,7 @@ class BeitShabbatCard extends BeitCardBase {
     if (config?.modes && !Array.isArray(config.modes)) throw new Error('modes must be a list');
     this._config = { modes: [...MODES], show_calendar: true, ...config };
     this._sig = null;
+    this._autoSig = null; // the modes shown may have changed
     this._render();
   }
 
@@ -2131,6 +2241,7 @@ class BeitShabbatCard extends BeitCardBase {
     const first = !this._hass;
     this._hass = hass;
     if (first) this._loadLabels();
+    else this._checkLabels();
     if (this._autoSig !== this._automationIds()) this._loadAuto();
     this._render();
     this._members?.render();
@@ -2154,6 +2265,7 @@ class BeitShabbatCard extends BeitCardBase {
 
   disconnectedCallback() {
     clearInterval(this._clock);
+    this._members?.dlg?.close();
   }
 
   _automationIds() {
@@ -2188,7 +2300,8 @@ class BeitShabbatCard extends BeitCardBase {
     const calIds = [cal.issur, cal.candleLighting, cal.havdalah, cal.date, cal.parasha, cal.holiday, ...Object.values(cal.hebcal)].filter(Boolean);
     const sig = JSON.stringify([
       this._lang, this._isAdmin, this._config, new Date().toDateString(), new Date().getHours(), this._busy,
-      calIds.map((id) => states[id]?.state), this._labels?.length, this._auto, this._startEdit, this._start,
+      calIds.map((id) => states[id]?.state), this._labels?.length, this._auto, this._start,
+      this._startEdit && [this._startEdit.mode, this._startEdit.kind, this._startEdit.error], // not what is typed
       Object.values(this._auto || {}).map((a) => a && states[a.entityId]?.state),
       modes.map((m) => [members[m].automations.map((e) => [e.entity_id, e.state]), members[m].schedules.map((e) => [e.entity_id, e.last_updated])]),
     ]);
@@ -2238,11 +2351,11 @@ class BeitShabbatCard extends BeitCardBase {
       <div class="mode-head">
         <span class="glyph" aria-hidden="true">${MODE_GLYPH[mode]}</span>
         <div class="grow"><div class="mode-title">${esc(t.modeTitle(name))}</div><div class="muted small">${esc(status)}</div></div>
-        ${switchHtml({ checked: state === 'on', partial: state === 'partial', disabled: state === 'empty' || busy, label: t.modeSwitch(name), attrs: `data-master="${esc(mode)}"` })}
+        ${switchHtml({ checked: state === 'on', partial: state === 'partial', disabled: state === 'empty' || busy, label: t.modeSwitch(name), attrs: `data-master="${esc(mode)}" id="master-${esc(mode)}"` })}
       </div>
       ${automations.length ? `<div class="members">${automations.map((a) => `
         <div class="member"><span class="grow">${esc(entityName(a))}</span>
-          ${switchHtml({ checked: a.state === 'on', label: entityName(a), attrs: `data-auto="${esc(a.entity_id)}"` })}</div>`).join('')}</div>` : ''}
+          ${switchHtml({ checked: a.state === 'on', label: entityName(a), attrs: `data-auto="${esc(a.entity_id)}" id="member-${esc(a.entity_id)}"` })}</div>`).join('')}</div>` : ''}
       ${schedules.length ? `<div class="scheds"><div class="label muted small">${esc(t.scheduleList)}</div>${schedules.map((s) => {
         const next = s.attributes?.next_event ? new Date(s.attributes.next_event) : null;
         const on = s.state === 'on';
@@ -2269,13 +2382,13 @@ class BeitShabbatCard extends BeitCardBase {
     const start = this._currentStart(mode);
     const canEditStart = this._isAdmin && this._autoLoaded && !unavailable && (!auto || (auto.ours && parseAutoStart(auto.config)));
     const hint = unavailable ? (mode === 'שבת' ? t.errNoCalendar : t.errNoJewishCalendar)
-      : auto && !auto.ours ? t.autoShabbatNotOurs : t.autoHint(mode, startText(start, this._lang));
+      : auto && !auto.ours ? t.autoShabbatNotOurs : t.autoHint(mode);
     return `<div class="auto">
       <div class="grow"><div>${esc(t.autoTitle[mode])}</div>
         <div class="muted small">${esc(hint)}</div>
         ${canEditStart && this._startEdit?.mode !== mode ? `<div class="small start-line">${esc(t.startLabel)}: ${esc(startText(start, this._lang))} ·
           <button class="link" data-act="startEdit" data-mode="${esc(mode)}">${esc(t.change)}</button></div>` : ''}</div>
-      ${switchHtml({ checked: on, disabled, label: t.autoTitle[mode], attrs: `data-automode="${esc(mode)}"` })}
+      ${switchHtml({ checked: on, disabled, label: t.autoTitle[mode], attrs: `data-automode="${esc(mode)}" id="auto-${esc(mode)}"` })}
     </div>
     ${this._startEdit?.mode === mode ? this._startPanelHtml(mode, cal) : ''}`;
   }
@@ -2429,6 +2542,10 @@ class MembershipDialog {
     const states = this.card._hass.states;
     const reg = this.card._registry();
     const members = new Set(modeMembers(states, reg, this.mode).map((e) => e.entity_id));
+    const sig = JSON.stringify([this.query, [...this.busy], [...members],
+      Object.values(states).filter((e) => e.entity_id.startsWith('automation.')).map((e) => [e.entity_id, entityName(e)])]);
+    if (sig === this._sig) return; // hass changes many times a second; a rebuilt list swallows clicks
+    this._sig = sig;
     const q = this.query.trim().toLowerCase();
     const autos = Object.values(states)
       .filter((e) => e.entity_id.startsWith('automation.') && !isAutoAlias(e.attributes?.friendly_name))
@@ -2440,7 +2557,9 @@ class MembershipDialog {
       <label class="check-row"><input type="checkbox" data-id="${esc(a.entity_id)}" ${members.has(a.entity_id) ? 'checked' : ''} ${this.busy.has(a.entity_id) ? 'disabled' : ''}>
         <span class="grow"><span>${esc(entityName(a))}</span><span class="muted small" dir="ltr">${esc(a.entity_id)}</span></span>
         ${this.busy.has(a.entity_id) ? '<span class="spinner"></span>' : ''}</label>`).join('') : `<div class="muted">${esc(t.noAutomations)}</div>`;
-    if (focusId) list.querySelector(`[data-id="${CSS.escape(focusId)}"]`)?.focus();
+    const again = this.refocus && !this.busy.has(this.refocus) ? this.refocus : focusId;
+    if (again) list.querySelector(`[data-id="${CSS.escape(again)}"]`)?.focus();
+    if (again === this.refocus) this.refocus = null;
   }
 
   async toggle(input) {
@@ -2449,6 +2568,7 @@ class MembershipDialog {
     const member = input.checked;
     const h = this.card._h;
     this.busy.add(id);
+    this.refocus = id; // the box is disabled while busy; focus comes back to it after
     this.renderList();
     try {
       // The automation and the schedules it follows move together; a schedule another member still follows stays.
