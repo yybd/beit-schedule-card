@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "card-preview", "runtimeExecutable": "python3", "runtimeArgs": ["dev/serve.py"], "port": 8766, "url": "http://localhost:8766" }
+  ]
+}
