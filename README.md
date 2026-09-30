@@ -20,6 +20,7 @@
 ## Contents
 
 - [Features](#features)
+- [Screenshots](#screenshots)
 - [Why Beit Schedule Card](#why-beit-schedule-card)
 - [Requirements](#requirements)
 - [Installation](#installation)
@@ -45,6 +46,18 @@
 - **Jewish calendar on the card.** Candle lighting, havdalah, the parasha and today's holiday, from the core
   [Jewish Calendar](https://www.home-assistant.io/integrations/jewish_calendar/) integration (or Hebcal, if installed).
 - **Hebrew first.** Full right-to-left layout and a week that starts on Sunday. English is also supported.
+
+## Screenshots
+
+All screenshots use the invented house in `tests/fixtures`.
+
+| Editing a schedule | A new schedule for an air conditioner |
+|:-:|:-:|
+| <img src="docs/editor.png" alt="The editor: name, Shabbat mode, the automations it drives and the week" width="380"> | <img src="docs/new-schedule.png" alt="A new schedule: the device, HVAC mode, temperature and turn off at the end" width="380"> |
+
+| English, dark theme, fixed height | On a phone |
+|:-:|:-:|
+| <img src="docs/dark-english.png" alt="Both cards in English with a dark theme" width="440"> | <img src="docs/mobile.png" alt="The editor full screen on a phone" width="220"> |
 
 ## Why Beit Schedule Card
 

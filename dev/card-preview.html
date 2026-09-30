@@ -107,6 +107,24 @@
       editors.push(ed);
     });
   }
+  // ?open=<schedule entity id> or ?open=new[&device=<entity id>]: open the editor on load (for docs screenshots).
+  const open = q.get('open');
+  if (open) {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    await sleep(400);
+    const sr = cards[0].shadowRoot;
+    if (open === 'new') {
+      sr.querySelector('[data-act=new]').click();
+      if (q.get('device')) {
+        await sleep(100);
+        sr.querySelector('dialog [data-act=pick]').click();
+        await sleep(400);
+        sr.querySelector(`dialog [data-id="${CSS.escape(q.get('device'))}"]`)?.click();
+      }
+    } else sr.querySelector(`.row[data-id="${CSS.escape(open)}"]`)?.click();
+    await sleep(300);
+    sr.activeElement?.blur();
+  }
   function push(h) {
     if (!source) return;
     [...cards, ...editors].forEach((c) => { if (c.setConfig) c.hass = h || source.snapshot(); });
