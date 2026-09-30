@@ -648,6 +648,30 @@ export const STRINGS = {
     editRange: 'עריכת טווח',
     removeRange: 'מחיקת טווח',
     hvac: { cool: 'קירור', heat: 'חימום', heat_cool: 'אוטומטי', auto: 'אוטומטי', dry: 'ייבוש', fan_only: 'מאוורר' },
+    shabbatAndChag: 'שבת וחג',
+    modeTitle: (m) => `מצב ${m}`,
+    modeEmpty: 'אין עדיין אוטומציות במצב הזה',
+    modeOn: (n) => `פעיל — ${n} אוטומציות`,
+    modeOff: 'כבוי',
+    modePartial: (on, n) => `פעיל חלקית — ${on} מתוך ${n}`,
+    modeSwitch: (m) => `הפעלת מצב ${m}`,
+    scheduleList: 'תזמונים',
+    chooseAutomations: 'בחירת אוטומציות',
+    automationsIn: (m) => `אוטומציות במצב ${m}`,
+    searchAutomation: 'חיפוש אוטומציה',
+    noAutomations: 'לא נמצאו אוטומציות',
+    autoShabbat: 'שבת אוטומטית',
+    autoShabbatHint: 'מדליק את מצב השבת בשישי ב-12:00, ומכבה אחרי צאת השבת כשכל תזמוני השבת הסתיימו.',
+    autoShabbatNotOurs: 'אוטומציה בשם הזה נכתבה ידנית — כיבוי רק ישבית אותה.',
+    autoShabbatDelete: 'לכבות את השבת האוטומטית? האוטומציה תימחק, ואפשר ליצור אותה שוב בלחיצה.',
+    autoChagHint: 'מצב חג אוטומטי עוד לא זמין. אינטגרציית Jewish Calendar מאפשרת אותו בעתיד.',
+    calToday: 'היום',
+    calParasha: 'פרשה',
+    calHoliday: 'חג',
+    calCandles: 'הדלקת נרות',
+    calHavdalah: 'הבדלה',
+    calInEffect: 'שבת / חג עכשיו',
+    selfExcluded: 'אוטומציית השבת האוטומטית לא יכולה להיות חלק מהמצב — היא הייתה מכבה את עצמה.',
   },
   en: {
     errName: 'The schedule needs a name',
@@ -717,6 +741,30 @@ export const STRINGS = {
     editRange: 'Edit range',
     removeRange: 'Remove range',
     hvac: { cool: 'Cool', heat: 'Heat', heat_cool: 'Auto', auto: 'Auto', dry: 'Dry', fan_only: 'Fan' },
+    shabbatAndChag: 'Shabbat & chag',
+    modeTitle: (m) => `${m} mode`,
+    modeEmpty: 'No automations in this mode yet',
+    modeOn: (n) => `On — ${n} automations`,
+    modeOff: 'Off',
+    modePartial: (on, n) => `Partly on — ${on} of ${n}`,
+    modeSwitch: (m) => `${m} mode`,
+    scheduleList: 'Schedules',
+    chooseAutomations: 'Choose automations',
+    automationsIn: (m) => `Automations in ${m} mode`,
+    searchAutomation: 'Search automations',
+    noAutomations: 'No automations found',
+    autoShabbat: 'Automatic Shabbat',
+    autoShabbatHint: 'Turns Shabbat mode on on Friday at 12:00, and off after Shabbat ends once every Shabbat schedule has finished.',
+    autoShabbatNotOurs: 'An automation with this name was written by hand; switching off only disables it.',
+    autoShabbatDelete: 'Turn automatic Shabbat off? Its automation is deleted; one click creates it again.',
+    autoChagHint: 'Automatic chag mode is not available yet. The Jewish Calendar integration makes it possible later.',
+    calToday: 'Today',
+    calParasha: 'Parasha',
+    calHoliday: 'Holiday',
+    calCandles: 'Candle lighting',
+    calHavdalah: 'Havdalah',
+    calInEffect: 'Shabbat / chag now',
+    selfExcluded: 'The automatic-Shabbat automation cannot be part of the mode: it would switch itself off.',
   },
 };
 
@@ -904,7 +952,7 @@ class BeitScheduleCard extends BeitCardBase {
   setConfig(config) {
     if (config?.entities && !Array.isArray(config.entities)) throw new Error('entities must be a list');
     if (config?.hide_entities && !Array.isArray(config.hide_entities)) throw new Error('hide_entities must be a list');
-    this._config = { show_add: true, ...config };
+    this._config = { show_add: true, show_modes: true, ...config };
     this._sig = null;
     this._render();
   }
@@ -1013,7 +1061,7 @@ class BeitScheduleCard extends BeitCardBase {
     const id = e.entity_id.slice('schedule.'.length);
     const week = this._weeks?.[id];
     const yaml = e.attributes?.editable === false || (this._weeks && !week);
-    const mode = this._modeOf(e.entity_id, reg);
+    const mode = this._config.show_modes !== false ? this._modeOf(e.entity_id, reg) : null;
     const on = e.state === 'on';
     const next = e.attributes?.next_event ? new Date(e.attributes.next_event) : null;
     const editable = canEdit && !yaml && !!week;
@@ -1195,14 +1243,14 @@ class ScheduleEditor {
       ${this.error ? `<div class="error" role="alert">${icon('alert')}<span>${esc(this.error)}</span></div>` : ''}
       <label class="field"><span>${esc(t.name)}</span>
         <input id="name" data-focus="name" value="${esc(this.week.name)}" autocomplete="off" ${this.isNew ? '' : ''}></label>
-      <div class="section">
+      ${this.card._config.show_modes === false ? '' : `<div class="section">
         <div class="label">${esc(t.type)}</div>
         <div class="seg" role="radiogroup" aria-label="${esc(t.type)}">
           ${seg.map(([m, label, glyph]) => `<button role="radio" aria-checked="${this.mode === m}" data-act="mode" data-mode="${esc(m ?? '')}"
             data-focus="mode-${esc(m ?? '')}">${glyph ? `<span aria-hidden="true">${glyph}</span>` : ''}${esc(label)}</button>`).join('')}
         </div>
         ${this.mode ? `<div class="muted small">${esc(t.modeHint(t.modeName[this.mode]))}</div>` : ''}
-      </div>
+      </div>`}
       ${this.isNew ? this.targetHtml() : `<div class="section linked">${this.linkedHtml()}</div>`}
       <div class="section">
         <div class="label row-between"><span>${esc(t.hours)}</span>
@@ -1630,16 +1678,340 @@ const SCHEDULE_STYLE = `
   .bar i { position: absolute; top: 0; bottom: 0; background: var(--primary-color); border-radius: 3px; }
 `;
 
-export { BeitScheduleCard, BeitCardBase };
+// ---------------------------------------------------------------------------- beit-shabbat-card
+
+/** What the calendar block shows, from findCalendar: Jewish Calendar values first, Hebcal's where it has none. */
+export function calendarRows(states, cal, lang = 'he', now = new Date()) {
+  const t = STRINGS[lang];
+  const val = (id) => (id && usable(states[id]) ? String(states[id].state) : null);
+  const when = (id, hebcalId) => {
+    const v = val(id);
+    if (v) {
+      const d = new Date(v);
+      if (!isNaN(d)) return formatWhen(d, now, lang);
+    }
+    return val(hebcalId);
+  };
+  const rows = [
+    ['calHoliday', val(cal.holiday) || (cal.holiday ? null : val(cal.hebcal.event))],
+    ['calParasha', val(cal.parasha) || val(cal.hebcal.parasha)],
+    ['calCandles', when(cal.candleLighting, cal.hebcal.candleLighting)],
+    ['calHavdalah', when(cal.havdalah, cal.hebcal.havdalah)],
+  ].filter(([, v]) => v);
+  return {
+    date: val(cal.date) || val(cal.hebcal.date),
+    inEffect: states[cal.issur]?.state === 'on' || states[cal.hebcal.isShabbat]?.state === 'True',
+    rows: rows.map(([k, v]) => ({ label: t[k], value: v })),
+  };
+}
+
+class BeitShabbatCard extends BeitCardBase {
+  static getStubConfig() {
+    return { modes: [...MODES], show_calendar: true };
+  }
+
+  setConfig(config) {
+    if (config?.modes && !Array.isArray(config.modes)) throw new Error('modes must be a list');
+    this._config = { modes: [...MODES], show_calendar: true, ...config };
+    this._sig = null;
+    this._render();
+  }
+
+  set hass(hass) {
+    const first = !this._hass;
+    this._hass = hass;
+    if (first) this._loadLabels();
+    if (this._autoSig !== this._automationIds()) this._loadAuto();
+    this._render();
+    this._members?.render();
+  }
+
+  get hass() {
+    return this._hass;
+  }
+
+  getCardSize() {
+    return 3 + this._config.modes.length * 3;
+  }
+
+  getGridOptions() {
+    return { columns: 12, min_columns: 6 };
+  }
+
+  connectedCallback() {
+    this._clock = setInterval(() => this._render(), 60000);
+  }
+
+  disconnectedCallback() {
+    clearInterval(this._clock);
+  }
+
+  _automationIds() {
+    return Object.keys(this._hass?.states || {}).filter((id) => id.startsWith('automation.')).join('|');
+  }
+
+  /** Finds the automatic-Shabbat automation. Its config is admin-only; others see it by alias alone. */
+  async _loadAuto() {
+    this._autoSig = this._automationIds();
+    if (!this._config.modes.includes('שבת')) return;
+    if (!this._isAdmin) {
+      const hit = Object.values(this._hass.states).find((e) => e.entity_id.startsWith('automation.') && e.attributes?.friendly_name === AUTO_SHABBAT_ALIAS);
+      this._auto = hit ? { entityId: hit.entity_id, ours: true } : null;
+    } else {
+      try {
+        this._auto = await findAutoShabbat(this._h);
+      } catch {
+        this._auto = null;
+      }
+    }
+    this._autoLoaded = true;
+    this._render(true);
+  }
+
+  _render(force = false) {
+    if (!this._config || !this._hass) return;
+    const states = this._hass.states;
+    const reg = this._registry();
+    const cal = findCalendar(states);
+    const modes = this._config.modes.filter((m) => MODES.includes(m));
+    const members = Object.fromEntries(modes.map((m) => [m, {
+      automations: modeMembers(states, reg, m).filter((e) => e.attributes?.friendly_name !== AUTO_SHABBAT_ALIAS),
+      schedules: modeMembers(states, reg, m, 'schedule'),
+    }]));
+    const calIds = [cal.issur, cal.candleLighting, cal.havdalah, cal.date, cal.parasha, cal.holiday, ...Object.values(cal.hebcal)].filter(Boolean);
+    const sig = JSON.stringify([
+      this._lang, this._isAdmin, this._config, new Date().toDateString(), new Date().getHours(), this._busy,
+      calIds.map((id) => states[id]?.state), this._labels?.length, this._auto, this._auto && states[this._auto.entityId]?.state,
+      modes.map((m) => [members[m].automations.map((e) => [e.entity_id, e.state]), members[m].schedules.map((e) => [e.entity_id, e.last_updated])]),
+    ]);
+    if (!force && sig === this._sig) return;
+    this._sig = sig;
+    const root = this._root();
+    if (!root.querySelector('ha-card')) {
+      root.innerHTML = `<style>${BASE_STYLE}${SHABBAT_STYLE}${EDITOR_STYLE}</style><ha-card><div class="body"></div></ha-card><div class="toast" hidden role="status"></div>`;
+      root.addEventListener('click', (e) => this._onClick(e));
+      root.addEventListener('change', (e) => this._onChange(e));
+    }
+    const t = this._t;
+    const body = root.querySelector('.body');
+    body.setAttribute('dir', this._dirAttr());
+    body.innerHTML = `
+      ${this._config.title !== '' ? `<div class="header"><h2>${esc(this._config.title ?? t.shabbatAndChag)}</h2></div>` : ''}
+      ${this._config.show_calendar !== false ? this._calendarHtml(states, cal) : ''}
+      ${modes.map((m) => this._modeHtml(m, members[m], cal)).join('')}`;
+  }
+
+  _calendarHtml(states, cal) {
+    const c = calendarRows(states, cal, this._lang);
+    if (!c.date && !c.rows.length) return '';
+    return `<div class="cal">
+      <div class="cal-date">${esc(c.date || '')}${c.inEffect ? `<span class="chip shabbat">${esc(this._t.calInEffect)}</span>` : ''}</div>
+      ${c.rows.map((r) => `<div class="cal-row"><span class="muted">${esc(r.label)}</span><span>${esc(r.value)}</span></div>`).join('')}
+    </div>`;
+  }
+
+  _modeHtml(mode, { automations, schedules }, cal) {
+    const t = this._t;
+    const name = t.modeName[mode];
+    const state = modeState(automations);
+    const onCount = automations.filter((a) => a.state === 'on').length;
+    const status = state === 'empty' ? t.modeEmpty : state === 'on' ? t.modeOn(automations.length) : state === 'off' ? t.modeOff : t.modePartial(onCount, automations.length);
+    const busy = this._busy === mode;
+    const now = new Date();
+    return `<section class="mode ${mode === 'שבת' ? 'shabbat' : 'chag'} ${state}">
+      <div class="mode-head">
+        <span class="glyph" aria-hidden="true">${MODE_GLYPH[mode]}</span>
+        <div class="grow"><div class="mode-title">${esc(t.modeTitle(name))}</div><div class="muted small">${esc(status)}</div></div>
+        ${switchHtml({ checked: state === 'on', partial: state === 'partial', disabled: state === 'empty' || busy, label: t.modeSwitch(name), attrs: `data-master="${esc(mode)}"` })}
+      </div>
+      ${automations.length ? `<div class="members">${automations.map((a) => `
+        <div class="member"><span class="grow">${esc(entityName(a))}</span>
+          ${switchHtml({ checked: a.state === 'on', label: entityName(a), attrs: `data-auto="${esc(a.entity_id)}"` })}</div>`).join('')}</div>` : ''}
+      ${schedules.length ? `<div class="scheds"><div class="label muted small">${esc(t.scheduleList)}</div>${schedules.map((s) => {
+        const next = s.attributes?.next_event ? new Date(s.attributes.next_event) : null;
+        const on = s.state === 'on';
+        return `<div class="sched"><span class="dot ${on ? 'on' : ''}"></span><span class="grow">${esc(entityName(s))}</span>
+          ${next && !isNaN(next) ? `<span class="muted small">${esc(`${on ? t.ends : t.starts} ${formatWhen(next, now, this._lang)}`)}</span>` : ''}</div>`;
+      }).join('')}</div>` : ''}
+      ${mode === 'שבת' ? this._autoHtml(cal) : `<div class="muted small hint-line">${esc(t.autoChagHint)}</div>`}
+      ${this._isAdmin ? `<div class="mode-foot"><button class="btn" data-act="members" data-mode="${esc(mode)}">${icon('checklist')}<span>${esc(t.chooseAutomations)}</span></button></div>` : ''}
+    </section>`;
+  }
+
+  _autoHtml(cal) {
+    const t = this._t;
+    const auto = this._auto;
+    const on = !!auto && this._hass.states[auto.entityId]?.state === 'on';
+    const noCalendar = !auto && !autoShabbatEndTrigger(cal);
+    const disabled = !this._isAdmin || !this._autoLoaded || this._busy === 'auto' || noCalendar;
+    return `<div class="auto">
+      <div class="grow"><div>${esc(t.autoShabbat)}</div>
+        <div class="muted small">${esc(noCalendar ? t.errNoCalendar : auto && !auto.ours ? t.autoShabbatNotOurs : t.autoShabbatHint)}</div></div>
+      ${switchHtml({ checked: on, disabled, label: t.autoShabbat, attrs: 'data-autoshabbat="1"' })}
+    </div>`;
+  }
+
+  _onClick(e) {
+    const el = e.target.closest?.('[data-act]');
+    if (el?.dataset.act === 'members' && !this._members) {
+      this._members = new MembershipDialog(this, el.dataset.mode);
+      this._members.open();
+    }
+  }
+
+  async _onChange(e) {
+    const d = e.target.dataset || {};
+    const on = e.target.checked;
+    if (d.master) {
+      this._busy = d.master;
+      this._render(true);
+      await this._run(() => setModeEnabled(this._h, this._registry(), d.master, on));
+      this._busy = null;
+      this._render(true);
+    } else if (d.auto) {
+      await this._run(() => setAutomationEnabled(this._h, d.auto, on));
+      this._render(true);
+    } else if (d.autoshabbat) {
+      if (!on && this._auto?.ours && !confirm(this._t.autoShabbatDelete)) {
+        e.target.checked = true;
+        return;
+      }
+      this._busy = 'auto';
+      this._render(true);
+      await this._run(() => (on ? enableAutoShabbat(this._h) : disableAutoShabbat(this._h)));
+      this._busy = null;
+      await this._loadAuto();
+      this._loadLabels();
+    }
+  }
+}
+
+/** "Choose automations": a checklist that writes the mode's label to an automation and the schedules it follows. */
+class MembershipDialog {
+  constructor(card, mode) {
+    this.card = card;
+    this.mode = mode;
+    this.busy = new Set();
+    this.query = '';
+  }
+
+  open() {
+    const dlg = document.createElement('dialog');
+    dlg.className = 'editor';
+    dlg.setAttribute('aria-labelledby', 'dlg-title');
+    this.card._root().appendChild(dlg);
+    this.dlg = dlg;
+    dlg.addEventListener('click', (e) => {
+      if (e.target.closest?.('[data-act=close]')) dlg.close();
+    });
+    dlg.addEventListener('input', (e) => {
+      if (e.target.id === 'q') {
+        this.query = e.target.value;
+        this.renderList();
+      }
+    });
+    dlg.addEventListener('change', (e) => this.toggle(e.target));
+    dlg.addEventListener('close', () => {
+      dlg.remove();
+      this.card._members = null;
+    });
+    const t = this.card._t;
+    dlg.setAttribute('dir', this.card._dirAttr());
+    dlg.innerHTML = `<div class="dlg-head"><button class="icon-btn" data-act="close" aria-label="${esc(t.close)}">${icon('close')}</button>
+      <h3 id="dlg-title">${esc(t.automationsIn(t.modeName[this.mode]))}</h3></div>
+      <div class="dlg-body"><label class="search">${icon('search')}<input type="search" id="q" placeholder="${esc(t.searchAutomation)}" aria-label="${esc(t.searchAutomation)}"></label>
+      <div class="muted small">${esc(t.selfExcluded)}</div><div class="checklist"></div></div>`;
+    this.renderList();
+    dlg.showModal();
+  }
+
+  render() {
+    if (this.dlg) this.renderList();
+  }
+
+  renderList() {
+    const t = this.card._t;
+    const states = this.card._hass.states;
+    const reg = this.card._registry();
+    const members = new Set(modeMembers(states, reg, this.mode).map((e) => e.entity_id));
+    const q = this.query.trim().toLowerCase();
+    const autos = Object.values(states)
+      .filter((e) => e.entity_id.startsWith('automation.') && e.attributes?.friendly_name !== AUTO_SHABBAT_ALIAS)
+      .filter((e) => !q || entityName(e).toLowerCase().includes(q) || e.entity_id.includes(q))
+      .sort((a, b) => entityName(a).localeCompare(entityName(b), this.card._lang));
+    const list = this.dlg.querySelector('.checklist');
+    const focusId = this.card._root().activeElement?.dataset?.id;
+    list.innerHTML = autos.length ? autos.map((a) => `
+      <label class="check-row"><input type="checkbox" data-id="${esc(a.entity_id)}" ${members.has(a.entity_id) ? 'checked' : ''} ${this.busy.has(a.entity_id) ? 'disabled' : ''}>
+        <span class="grow"><span>${esc(entityName(a))}</span><span class="muted small" dir="ltr">${esc(a.entity_id)}</span></span>
+        ${this.busy.has(a.entity_id) ? '<span class="spinner"></span>' : ''}</label>`).join('') : `<div class="muted">${esc(t.noAutomations)}</div>`;
+    if (focusId) list.querySelector(`[data-id="${CSS.escape(focusId)}"]`)?.focus();
+  }
+
+  async toggle(input) {
+    const id = input.dataset?.id;
+    if (!id) return;
+    const member = input.checked;
+    const h = this.card._h;
+    this.busy.add(id);
+    this.renderList();
+    try {
+      // The automation and the schedules it follows move together.
+      const schedules = schedulesIn(await automationConfig(h, id));
+      await setModeMembership(h, this.mode, [id, ...schedules], member);
+      await this.card._loadLabels();
+    } catch (err) {
+      this.card._toast(errorText(err));
+    } finally {
+      this.busy.delete(id);
+      this.renderList();
+    }
+  }
+}
+
+const SHABBAT_STYLE = `
+  .cal { margin: 0 16px 8px; padding: 12px 14px; border-radius: 10px; background: color-mix(in srgb, #ffa000 10%, transparent); }
+  .cal-date { font-weight: 600; font-size: 15px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+  .cal-row { display: flex; gap: 12px; font-size: 14px; padding: 2px 0; }
+  .cal-row .muted { min-width: 96px; }
+  .mode { margin: 8px 16px 12px; padding: 12px 0 4px; border-top: 1px solid var(--divider-color); }
+  .mode-head { display: flex; align-items: center; gap: 10px; }
+  .glyph { font-size: 22px; width: 32px; text-align: center; filter: grayscale(1); opacity: .6; }
+  .mode.on .glyph, .mode.partial .glyph { filter: none; opacity: 1; }
+  .mode-title { font-size: 17px; font-weight: 600; }
+  .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .members, .scheds { margin-top: 8px; padding-inline-start: 42px; }
+  .member, .auto { display: flex; align-items: center; gap: 8px; min-height: 36px; }
+  .sched { display: flex; align-items: center; gap: 8px; min-height: 26px; font-size: 14px; }
+  .sched .grow { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .auto { margin-top: 8px; padding: 8px 10px 8px 12px; border-radius: 10px; background: var(--secondary-background-color, rgba(127,127,127,.08)); }
+  .hint-line { margin-top: 8px; padding-inline-start: 42px; }
+  .mode-foot { display: flex; justify-content: flex-end; margin-top: 8px; }
+  .checklist { display: flex; flex-direction: column; }
+  .check-row { display: flex; align-items: center; gap: 12px; padding: 8px 4px; border-bottom: 1px solid var(--divider-color); cursor: pointer; }
+  .check-row input { width: 18px; height: 18px; margin: 0; accent-color: var(--primary-color); flex: none; }
+  .check-row .grow span:first-child { font-size: 15px; }
+`;
+
+export { BeitScheduleCard, BeitShabbatCard, BeitCardBase };
 
 if (typeof customElements !== 'undefined') {
   if (!customElements.get('beit-schedule-card')) customElements.define('beit-schedule-card', BeitScheduleCard);
+  if (!customElements.get('beit-shabbat-card')) customElements.define('beit-shabbat-card', BeitShabbatCard);
   window.customCards = window.customCards || [];
   if (!window.customCards.some((c) => c.type === 'beit-schedule-card')) {
     window.customCards.push({
       type: 'beit-schedule-card',
       name: 'Beit — תזמונים / Schedules',
       description: 'לוח זמנים שבועי לכל מכשיר, עם מצבי שבת וחג. Weekly device schedules with Shabbat and chag modes.',
+      preview: false,
+    });
+  }
+  if (!window.customCards.some((c) => c.type === 'beit-shabbat-card')) {
+    window.customCards.push({
+      type: 'beit-shabbat-card',
+      name: 'Beit — שבת וחג / Shabbat & chag',
+      description: 'מצבי שבת וחג בלחיצה, שבת אוטומטית וזמני השבת. Shabbat and chag modes, automatic Shabbat, and the times.',
       preview: false,
     });
   }
