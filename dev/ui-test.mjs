@@ -45,7 +45,8 @@ const CHECKS = [
     must(S().querySelectorAll('.row').length === 7, 'rows: ' + S().querySelectorAll('.row').length);
     must(S().querySelectorAll('.row .bars').length === 7, 'every schedule has its week, YAML too');
     must(S().querySelectorAll('.row[data-id]').length === 6, 'the YAML schedule is not editable');
-    must(S().querySelector('.lock'), 'YAML lock');
+    must([...S().querySelectorAll('.row')].some((r) => !r.dataset.id && r.textContent.includes('YAML')), 'the YAML schedule says so');
+    must(!S().querySelector('.body .ic') && !B().querySelector('.body .ic'), 'no icons in the cards');
     must(B().querySelectorAll('.mode').length === 2, 'two modes');
     must(B().querySelectorAll('[data-automode]').length === 2, 'automatic Shabbat and chag');
     must(B().querySelector('.cal-date').textContent.includes('טבת'), 'calendar');

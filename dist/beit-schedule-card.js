@@ -11,7 +11,7 @@
  * Custom elements are registered only where `customElements` exists.
  */
 
-export const VERSION = '1.2.0';
+export const VERSION = '1.2.1';
 
 // ---------------------------------------------------------------------------- week model
 
@@ -1241,18 +1241,13 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const ICONS = {
   plus: 'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z',
   close: 'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z',
-  lock: 'M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z',
   delete: 'M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z',
   copy: 'M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z',
-  search: 'M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z',
   clock: 'M12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22C6.47,22 2,17.5 2,12A10,10 0 0,1 12,2M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z',
-  alert: 'M13,14H11V10H13M13,18H11V16H13M1,21H23L12,2L1,21Z',
-  checklist: 'M3,5H9V11H3V5M5,7V9H7V7H5M11,7H21V9H11V7M11,15H21V17H11V15M5,20L1.5,16.5L2.91,15.09L5,17.17L9.59,12.59L11,14L5,20Z',
   minus: 'M19,13H5V11H19V13Z',
   back: 'M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z',
 };
 const icon = (name, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
-const MODE_GLYPH = { שבת: '🕯️', חג: '✡️' };
 
 const BASE_STYLE = `
   :host { display: block; }
@@ -1571,7 +1566,7 @@ class BeitScheduleCard extends BeitCardBase {
     this._paint(`
       <div class="header">
         <h2>${esc(this._config.title ?? t.schedules)}</h2>
-        ${canEdit && this._config.show_add !== false ? `<button class="btn primary" data-act="new">${icon('plus')}<span>${esc(t.newSchedule)}</span></button>` : ''}
+        ${canEdit && this._config.show_add !== false ? `<button class="btn primary" data-act="new">${esc(t.newSchedule)}</button>` : ''}
       </div>`, `
       ${canEdit ? '' : `<div class="hint">${esc(t.readOnly)}</div>`}
       <div class="list" role="list">${rows || `<div class="hint">${esc(this._weeks || !canEdit ? t.noSchedules : t.loading)}</div>`}</div>`);
@@ -1594,8 +1589,7 @@ class BeitScheduleCard extends BeitCardBase {
         <div class="line">
           <span class="dot ${on ? 'on' : ''}" title="${esc(on ? t.onNow : t.offNow)}"></span>
           <span class="name">${esc(entityName(e))}</span>
-          ${mode ? `<span class="chip ${mode === 'שבת' ? 'shabbat' : 'chag'}">${MODE_GLYPH[mode]} ${esc(t.modeName[mode])}</span>` : ''}
-          ${yaml ? `<span class="lock" title="${esc(t.yaml)}" aria-label="${esc(t.yaml)}">${icon('lock')}</span>` : ''}
+          ${mode ? `<span class="chip ${mode === 'שבת' ? 'shabbat' : 'chag'}">${esc(t.modeName[mode])}</span>` : ''}
           <span class="spacer"></span>
           <span class="state ${on ? 'on' : ''}">${esc(on ? t.onNow : t.offNow)}</span>
         </div>
@@ -1833,9 +1827,9 @@ class ScheduleEditor {
 
   mainHtml() {
     const t = this.t;
-    const seg = [[null, t.regular, ''], ...MODES.map((m) => [m, t.modeName[m], MODE_GLYPH[m]])];
+    const seg = [[null, t.regular], ...MODES.map((m) => [m, t.modeName[m]])];
     return `
-      ${this.error ? `<div class="error" role="alert">${icon('alert')}<span>${esc(this.error)}</span></div>` : ''}
+      ${this.error ? `<div class="error" role="alert"><span>${esc(this.error)}</span></div>` : ''}
       ${this.isNew ? this.targetHtml() : ''}
       <label class="field"><span>${esc(t.name)}</span>
         <input id="name" data-focus="name" value="${esc(this.week.name)}" autocomplete="off"
@@ -1843,8 +1837,8 @@ class ScheduleEditor {
       ${this.card._config.show_modes === false ? '' : `<div class="section">
         <div class="label">${esc(t.type)}</div>
         <div class="seg" role="radiogroup" aria-label="${esc(t.type)}">
-          ${seg.map(([m, label, glyph]) => `<button role="radio" aria-checked="${this.mode === m}" data-act="mode" data-mode="${esc(m ?? '')}"
-            data-focus="mode-${esc(m ?? '')}">${glyph ? `<span aria-hidden="true">${glyph}</span>` : ''}${esc(label)}</button>`).join('')}
+          ${seg.map(([m, label]) => `<button role="radio" aria-checked="${this.mode === m}" data-act="mode" data-mode="${esc(m ?? '')}"
+            data-focus="mode-${esc(m ?? '')}">${esc(label)}</button>`).join('')}
         </div>
         ${this.mode ? `<div class="muted small">${esc(t.modeHint(t.modeName[this.mode]))}</div>` : ''}
       </div>`}
@@ -1891,7 +1885,7 @@ class ScheduleEditor {
       <div class="label">${esc(title)}</div>
       <button class="device" data-act="pick" data-focus="pick">
         ${d ? `<span class="dname">${esc(entityName(d))}</span><span class="muted small" dir="ltr">${esc(d.entity_id)}</span><span class="spacer"></span><span class="link">${esc(t.changeDevice)}</span>`
-          : `${icon('plus')}<span>${esc(t.chooseDevice)}</span>`}
+          : `<span>${esc(t.chooseDevice)}</span>`}
       </button>
       ${options}
     </div>`;
@@ -1903,7 +1897,7 @@ class ScheduleEditor {
     const states = this.card._hass.states;
     let inner;
     if (autos === null) inner = `<div class="muted small">${esc(t.loading)}</div>`;
-    else if (!autos.length) inner = `<div class="warn">${icon('alert')}<span>${esc(t.drivesNothing)}</span></div>`;
+    else if (!autos.length) inner = `<div class="warn"><span>${esc(t.drivesNothing)}</span></div>`;
     else {
       inner = autos.map((a) => {
         const on = states[a]?.state === 'on';
@@ -1962,7 +1956,7 @@ class ScheduleEditor {
     return `<div class="day">
       <div class="day-line">
         <span class="dname">${esc(name)}</span>
-        <div class="ranges">${chips}<button class="add" data-act="add" data-day="${i}" data-focus="add-${i}" aria-label="${esc(`${t.addRange} ${name}`)}">${icon('plus')}<span>${esc(t.addRange)}</span></button></div>
+        <div class="ranges">${chips}<button class="add" data-act="add" data-day="${i}" data-focus="add-${i}" aria-label="${esc(`${t.addRange} ${name}`)}">+ ${esc(t.addRange)}</button></div>
         ${blocks.length ? `<button class="icon-btn" data-act="copyOpen" data-day="${i}" aria-label="${esc(`${t.copyDays} (${name})`)}" title="${esc(t.copyDays)}" data-focus="copy-${i}">${icon('copy')}</button>` : '<span class="icon-space"></span>'}
       </div>
       ${panel}
@@ -1977,7 +1971,7 @@ class ScheduleEditor {
     const types = PICKABLE_DOMAINS.filter((d) => present.has(d));
     const chip = (v, label) => `<button class="choice" role="radio" aria-checked="${(this.domainFilter ?? null) === v}" data-act="domain"
       data-v="${esc(v ?? '')}" data-focus="domain-${esc(v ?? 'all')}">${esc(label)}</button>`;
-    return `<div class="picker-top"><label class="search">${icon('search')}<input type="search" id="q" data-focus="q" data-autofocus placeholder="${esc(t.searchDevice)}"
+    return `<div class="picker-top"><label class="search"><input type="search" id="q" data-focus="q" data-autofocus placeholder="${esc(t.searchDevice)}"
       aria-label="${esc(t.searchDevice)}" value="${esc(this.query)}"></label>
       ${types.length > 1 ? `<div class="chips types" role="radiogroup" aria-label="${esc(t.device)}">${chip(null, t.allTypes)}${types.map((d) => chip(d, t.domainName[d] || d)).join('')}</div>` : ''}</div>
       <div class="picker-list">${this.pickerListHtml()}</div>`;
@@ -1999,7 +1993,7 @@ class ScheduleEditor {
   confirmHtml() {
     const t = this.t;
     return `<p>${esc(t.deleteText)}</p>
-      ${this.error ? `<div class="error" role="alert">${icon('alert')}<span>${esc(this.error)}</span></div>` : ''}
+      ${this.error ? `<div class="error" role="alert"><span>${esc(this.error)}</span></div>` : ''}
       <div class="actions"><button class="btn" data-act="back" ${this.saving ? 'disabled' : ''}>${esc(t.cancel)}</button>
         <button class="btn primary danger-fill" data-act="doDelete" data-autofocus ${this.saving ? 'disabled' : ''}>${this.saving ? '<span class="spinner"></span>' : ''}${esc(t.delete)}</button></div>`;
   }
@@ -2323,8 +2317,6 @@ const SCHEDULE_STYLE = `
   .spacer { flex: 1; }
   .state { font-size: 12px; color: var(--secondary-text-color); white-space: nowrap; }
   .state.on { color: var(--success-color, #43a047); font-weight: 500; }
-  .lock { display: inline-flex; color: var(--secondary-text-color); }
-  .lock .ic { width: 16px; height: 16px; }
   .when { margin: 2px 16px 0; }
   .bars { margin: 8px 16px 0; display: flex; flex-direction: column; gap: 3px; }
   .bar-row { display: flex; align-items: center; gap: 6px; }
@@ -2489,7 +2481,6 @@ class BeitShabbatCard extends BeitCardBase {
     const now = new Date();
     return `<section class="mode ${mode === 'שבת' ? 'shabbat' : 'chag'} ${state}">
       <div class="mode-head">
-        <span class="glyph" aria-hidden="true">${MODE_GLYPH[mode]}</span>
         <div class="grow"><div class="mode-title">${esc(t.modeTitle(name))}</div><div class="muted small">${esc(status)}</div></div>
         ${switchHtml({ checked: state === 'on', partial: state === 'partial', disabled: state === 'empty' || busy, label: t.modeSwitch(name), attrs: `data-master="${esc(mode)}" id="master-${esc(mode)}"` })}
       </div>
@@ -2503,7 +2494,7 @@ class BeitShabbatCard extends BeitCardBase {
           ${next && !isNaN(next) ? `<span class="muted small">${esc(`${on ? t.ends : t.starts} ${formatWhen(next, now, this._lang)}`)}</span>` : ''}</div>`;
       }).join('')}</div>` : ''}
       ${this._autoHtml(mode, cal)}
-      ${this._isAdmin ? `<div class="mode-foot"><button class="btn" data-act="members" data-mode="${esc(mode)}">${icon('checklist')}<span>${esc(t.chooseAutomations)}</span></button></div>` : ''}
+      ${this._isAdmin ? `<div class="mode-foot"><button class="btn" data-act="members" data-mode="${esc(mode)}">${esc(t.chooseAutomations)}</button></div>` : ''}
     </section>`;
   }
 
@@ -2667,7 +2658,7 @@ class MembershipDialog {
     dlg.setAttribute('dir', this.card._dirAttr());
     dlg.innerHTML = `<div class="dlg-head"><button class="icon-btn" data-act="close" aria-label="${esc(t.close)}">${icon('close')}</button>
       <h3 id="dlg-title">${esc(t.automationsIn(t.modeName[this.mode]))}</h3></div>
-      <div class="dlg-body"><label class="search">${icon('search')}<input type="search" id="q" placeholder="${esc(t.searchAutomation)}" aria-label="${esc(t.searchAutomation)}"></label>
+      <div class="dlg-body"><label class="search"><input type="search" id="q" placeholder=""${esc(t.searchAutomation)}" aria-label="${esc(t.searchAutomation)}"></label>
       <div class="muted small">${esc(t.selfExcluded)}</div><div class="checklist"></div></div>`;
     this.renderList();
     dlg.showModal();
@@ -2730,11 +2721,9 @@ const SHABBAT_STYLE = `
   .cal-row .muted { min-width: 96px; }
   .mode { margin: 8px 16px 12px; padding: 12px 0 4px; border-top: 1px solid var(--divider-color); }
   .mode-head { display: flex; align-items: center; gap: 10px; }
-  .glyph { font-size: 22px; width: 32px; text-align: center; filter: grayscale(1); opacity: .6; }
-  .mode.on .glyph, .mode.partial .glyph { filter: none; opacity: 1; }
   .mode-title { font-size: 17px; font-weight: 600; }
   .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  .members, .scheds { margin-top: 8px; padding-inline-start: 42px; }
+  .members, .scheds { margin-top: 8px; }
   .member, .auto { display: flex; align-items: center; gap: 8px; min-height: 36px; }
   .sched { display: flex; align-items: center; gap: 8px; min-height: 26px; font-size: 14px; }
   .sched .grow { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2922,7 +2911,7 @@ class BeitShabbatCardEditor extends BeitEditorBase {
       </section>
       <section>
         <h3>${esc(t.edModes)}</h3>
-        ${MODES.map((m) => `<label class="chk"><input type="checkbox" data-mode="${esc(m)}" ${modes.includes(m) ? 'checked' : ''}><span>${MODE_GLYPH[m]} ${esc(t.modeTitle(t.modeName[m]))}</span></label>`).join('')}
+        ${MODES.map((m) => `<label class="chk"><input type="checkbox" data-mode="${esc(m)}" ${modes.includes(m) ? 'checked' : ''}><span>${esc(t.modeTitle(t.modeName[m]))}</span></label>`).join('')}
       </section>`);
     root.querySelectorAll('[data-key]').forEach((el) => el.addEventListener('change', () => this._emit({ ...this._config, [el.dataset.key]: el.value.trim() })));
     root.querySelector('[data-bool]').addEventListener('change', (e) => {
