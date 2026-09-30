@@ -1,0 +1,576 @@
+{
+ "automation.beit_living_room_ac_shabbat": {
+  "id": "1767000000001",
+  "alias": "Beit · מזגן סלון שבת",
+  "description": "נוצר באפליקציית Beit — מזגן סלון לפי schedule.living_room_ac_shabbat",
+  "triggers": [
+   {
+    "trigger": "state",
+    "entity_id": [
+     "schedule.living_room_ac_shabbat"
+    ],
+    "to": [
+     "on"
+    ],
+    "not_from": [
+     "unavailable",
+     "unknown"
+    ],
+    "id": "schedule_on"
+   },
+   {
+    "trigger": "state",
+    "entity_id": [
+     "schedule.living_room_ac_shabbat"
+    ],
+    "to": [
+     "off"
+    ],
+    "not_from": [
+     "unavailable",
+     "unknown"
+    ],
+    "id": "schedule_off"
+   }
+  ],
+  "conditions": [],
+  "actions": [
+   {
+    "choose": [
+     {
+      "conditions": [
+       {
+        "condition": "trigger",
+        "id": "schedule_on"
+       }
+      ],
+      "sequence": [
+       {
+        "action": "climate.set_temperature",
+        "target": {
+         "entity_id": "climate.living_room_ac"
+        },
+        "data": {
+         "temperature": 24,
+         "hvac_mode": "cool"
+        }
+       }
+      ]
+     },
+     {
+      "conditions": [
+       {
+        "condition": "trigger",
+        "id": "schedule_off"
+       }
+      ],
+      "sequence": [
+       {
+        "action": "climate.turn_off",
+        "target": {
+         "entity_id": "climate.living_room_ac"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "mode": "queued"
+ },
+ "automation.living_room_fan_shabbat": {
+  "id": "1600000000001",
+  "alias": "מאוורר סלון בשבת",
+  "description": "נכתב ביד",
+  "triggers": [
+   {
+    "trigger": "state",
+    "entity_id": [
+     "schedule.living_room_ac_shabbat"
+    ]
+   }
+  ],
+  "conditions": [],
+  "actions": [
+   {
+    "choose": [
+     {
+      "conditions": [
+       {
+        "condition": "state",
+        "entity_id": "schedule.living_room_ac_shabbat",
+        "state": "on"
+       }
+      ],
+      "sequence": [
+       {
+        "action": "switch.turn_on",
+        "target": {
+         "entity_id": "switch.night_light"
+        }
+       }
+      ]
+     },
+     {
+      "conditions": [
+       {
+        "condition": "state",
+        "entity_id": "schedule.living_room_ac_shabbat",
+        "state": "off"
+       }
+      ],
+      "sequence": [
+       {
+        "action": "switch.turn_off",
+        "target": {
+         "entity_id": "switch.night_light"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "mode": "single"
+ },
+ "automation.beit_bedroom_ac_shabbat": {
+  "id": "1767000000002",
+  "alias": "Beit · מזגן חדר שינה שבת",
+  "description": "נוצר באפליקציית Beit — מזגן חדר שינה לפי schedule.bedroom_ac_shabbat",
+  "triggers": [
+   {
+    "trigger": "state",
+    "entity_id": [
+     "schedule.bedroom_ac_shabbat"
+    ],
+    "to": [
+     "on"
+    ],
+    "not_from": [
+     "unavailable",
+     "unknown"
+    ],
+    "id": "schedule_on"
+   },
+   {
+    "trigger": "state",
+    "entity_id": [
+     "schedule.bedroom_ac_shabbat"
+    ],
+    "to": [
+     "off"
+    ],
+    "not_from": [
+     "unavailable",
+     "unknown"
+    ],
+    "id": "schedule_off"
+   }
+  ],
+  "conditions": [],
+  "actions": [
+   {
+    "choose": [
+     {
+      "conditions": [
+       {
+        "condition": "trigger",
+        "id": "schedule_on"
+       }
+      ],
+      "sequence": [
+       {
+        "action": "climate.set_hvac_mode",
+        "target": {
+         "entity_id": "climate.bedroom_ac"
+        },
+        "data": {
+         "hvac_mode": "cool"
+        }
+       }
+      ]
+     },
+     {
+      "conditions": [
+       {
+        "condition": "trigger",
+        "id": "schedule_off"
+       }
+      ],
+      "sequence": [
+       {
+        "action": "climate.turn_off",
+        "target": {
+         "entity_id": "climate.bedroom_ac"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "mode": "queued"
+ },
+ "automation.beit_hot_plate_shabbat": {
+  "id": "1767000000003",
+  "alias": "Beit · פלטה",
+  "description": "נוצר באפליקציית Beit — פלטה לפי schedule.hot_plate_shabbat",
+  "triggers": [
+   {
+    "trigger": "state",
+    "entity_id": [
+     "schedule.hot_plate_shabbat"
+    ],
+    "to": [
+     "on"
+    ],
+    "not_from": [
+     "unavailable",
+     "unknown"
+    ],
+    "id": "schedule_on"
+   },
+   {
+    "trigger": "state",
+    "entity_id": [
+     "schedule.hot_plate_shabbat"
+    ],
+    "to": [
+     "off"
+    ],
+    "not_from": [
+     "unavailable",
+     "unknown"
+    ],
+    "id": "schedule_off"
+   }
+  ],
+  "conditions": [],
+  "actions": [
+   {
+    "choose": [
+     {
+      "conditions": [
+       {
+        "condition": "trigger",
+        "id": "schedule_on"
+       }
+      ],
+      "sequence": [
+       {
+        "action": "switch.turn_on",
+        "target": {
+         "entity_id": "switch.hot_plate"
+        }
+       }
+      ]
+     },
+     {
+      "conditions": [
+       {
+        "condition": "trigger",
+        "id": "schedule_off"
+       }
+      ],
+      "sequence": [
+       {
+        "action": "switch.turn_off",
+        "target": {
+         "entity_id": "switch.hot_plate"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "mode": "queued"
+ },
+ "automation.beit_kids_ac_chag": {
+  "id": "1767000000004",
+  "alias": "Beit · מזגן ילדים חג",
+  "description": "נוצר באפליקציית Beit — מזגן ילדים לפי schedule.kids_ac_chag",
+  "triggers": [
+   {
+    "trigger": "state",
+    "entity_id": [
+     "schedule.kids_ac_chag"
+    ],
+    "to": [
+     "on"
+    ],
+    "not_from": [
+     "unavailable",
+     "unknown"
+    ],
+    "id": "schedule_on"
+   },
+   {
+    "trigger": "state",
+    "entity_id": [
+     "schedule.kids_ac_chag"
+    ],
+    "to": [
+     "off"
+    ],
+    "not_from": [
+     "unavailable",
+     "unknown"
+    ],
+    "id": "schedule_off"
+   }
+  ],
+  "conditions": [],
+  "actions": [
+   {
+    "choose": [
+     {
+      "conditions": [
+       {
+        "condition": "trigger",
+        "id": "schedule_on"
+       }
+      ],
+      "sequence": [
+       {
+        "action": "climate.set_hvac_mode",
+        "target": {
+         "entity_id": "climate.kids_ac"
+        },
+        "data": {
+         "hvac_mode": "cool"
+        }
+       }
+      ]
+     },
+     {
+      "conditions": [
+       {
+        "condition": "trigger",
+        "id": "schedule_off"
+       }
+      ],
+      "sequence": [
+       {
+        "action": "climate.turn_off",
+        "target": {
+         "entity_id": "climate.kids_ac"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "mode": "queued"
+ },
+ "automation.beit_water_heater_weekdays": {
+  "id": "1767000000005",
+  "alias": "Beit · דוד מים",
+  "description": "נוצר באפליקציית Beit — דוד חשמל לפי schedule.water_heater_weekdays",
+  "triggers": [
+   {
+    "trigger": "state",
+    "entity_id": [
+     "schedule.water_heater_weekdays"
+    ],
+    "to": [
+     "on"
+    ],
+    "not_from": [
+     "unavailable",
+     "unknown"
+    ],
+    "id": "schedule_on"
+   },
+   {
+    "trigger": "state",
+    "entity_id": [
+     "schedule.water_heater_weekdays"
+    ],
+    "to": [
+     "off"
+    ],
+    "not_from": [
+     "unavailable",
+     "unknown"
+    ],
+    "id": "schedule_off"
+   }
+  ],
+  "conditions": [],
+  "actions": [
+   {
+    "choose": [
+     {
+      "conditions": [
+       {
+        "condition": "trigger",
+        "id": "schedule_on"
+       }
+      ],
+      "sequence": [
+       {
+        "action": "water_heater.turn_on",
+        "target": {
+         "entity_id": "water_heater.boiler"
+        }
+       }
+      ]
+     },
+     {
+      "conditions": [
+       {
+        "condition": "trigger",
+        "id": "schedule_off"
+       }
+      ],
+      "sequence": [
+       {
+        "action": "water_heater.turn_off",
+        "target": {
+         "entity_id": "water_heater.boiler"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "mode": "queued"
+ },
+ "automation.balcony_light_evening": {
+  "id": "1600000000002",
+  "alias": "תאורת מרפסת בערב",
+  "description": "",
+  "triggers": [
+   {
+    "trigger": "state",
+    "entity_id": [
+     "schedule.balcony_light"
+    ]
+   }
+  ],
+  "conditions": [],
+  "actions": [
+   {
+    "choose": [
+     {
+      "conditions": [
+       {
+        "condition": "state",
+        "entity_id": "schedule.balcony_light",
+        "state": "on"
+       }
+      ],
+      "sequence": [
+       {
+        "action": "light.turn_on",
+        "target": {
+         "entity_id": "light.balcony"
+        },
+        "data": {
+         "brightness_pct": 60
+        }
+       }
+      ]
+     },
+     {
+      "conditions": [
+       {
+        "condition": "state",
+        "entity_id": "schedule.balcony_light",
+        "state": "off"
+       }
+      ],
+      "sequence": [
+       {
+        "action": "light.turn_off",
+        "target": {
+         "entity_id": "light.balcony"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "mode": "single"
+ },
+ "automation.pool_pump": {
+  "id": "1600000000003",
+  "alias": "משאבת בריכה",
+  "description": "",
+  "triggers": [
+   {
+    "trigger": "state",
+    "entity_id": [
+     "schedule.pool_pump"
+    ]
+   }
+  ],
+  "conditions": [],
+  "actions": [
+   {
+    "choose": [
+     {
+      "conditions": [
+       {
+        "condition": "state",
+        "entity_id": "schedule.pool_pump",
+        "state": "on"
+       }
+      ],
+      "sequence": [
+       {
+        "action": "switch.turn_on",
+        "target": {
+         "entity_id": "switch.night_light"
+        }
+       }
+      ]
+     },
+     {
+      "conditions": [
+       {
+        "condition": "state",
+        "entity_id": "schedule.pool_pump",
+        "state": "off"
+       }
+      ],
+      "sequence": [
+       {
+        "action": "switch.turn_off",
+        "target": {
+         "entity_id": "switch.night_light"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "mode": "single"
+ },
+ "automation.morning_music": {
+  "id": "1600000000004",
+  "alias": "מוזיקה בבוקר",
+  "description": "",
+  "triggers": [
+   {
+    "trigger": "time",
+    "at": "07:00:00"
+   }
+  ],
+  "conditions": [],
+  "actions": [
+   {
+    "action": "media_player.media_play",
+    "target": {
+     "entity_id": "media_player.kitchen_speaker"
+    }
+   }
+  ],
+  "mode": "single"
+ }
+}

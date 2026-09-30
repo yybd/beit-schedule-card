@@ -1,0 +1,52 @@
+[
+  {
+    "id": "living_room_ac_shabbat",
+    "name": "מזגן סלון שבת",
+    "sunday": [], "monday": [], "tuesday": [], "wednesday": [], "thursday": [],
+    "friday": [{ "from": "16:00:00", "to": "24:00:00" }],
+    "saturday": [{ "from": "13:30:00", "to": "17:30:00" }, { "from": "00:00:00", "to": "09:30:00" }]
+  },
+  {
+    "id": "bedroom_ac_shabbat",
+    "name": "מזגן חדר שינה שבת",
+    "sunday": [], "monday": [], "tuesday": [], "wednesday": [], "thursday": [],
+    "friday": [{ "from": "21:00:00", "to": "24:00:00" }],
+    "saturday": [{ "from": "00:00:00", "to": "07:00:00" }, { "from": "14:00:00", "to": "16:00:00" }]
+  },
+  {
+    "id": "kids_ac_chag",
+    "name": "מזגן ילדים חג",
+    "sunday": [], "monday": [], "tuesday": [], "wednesday": [],
+    "thursday": [{ "from": "19:00:00", "to": "24:00:00" }],
+    "friday": [{ "from": "00:00:00", "to": "08:00:00" }, { "from": "14:00:00", "to": "16:30:00" }],
+    "saturday": []
+  },
+  {
+    "id": "water_heater_weekdays",
+    "name": "דוד מים",
+    "sunday": [{ "from": "05:30:00", "to": "06:30:00" }, { "from": "17:00:00", "to": "18:00:00" }],
+    "monday": [{ "from": "05:30:00", "to": "06:30:00" }, { "from": "17:00:00", "to": "18:00:00" }],
+    "tuesday": [{ "from": "05:30:00", "to": "06:30:00" }, { "from": "17:00:00", "to": "18:00:00" }],
+    "wednesday": [{ "from": "05:30:00", "to": "06:30:00" }, { "from": "17:00:00", "to": "18:00:00" }],
+    "thursday": [{ "from": "05:30:00", "to": "06:30:00" }, { "from": "17:00:00", "to": "18:00:00" }],
+    "friday": [], "saturday": []
+  },
+  {
+    "id": "balcony_light",
+    "name": "תאורת מרפסת",
+    "sunday": [{ "from": "18:00:00", "to": "23:59:59" }],
+    "monday": [{ "from": "18:00:00", "to": "23:59:59" }],
+    "tuesday": [{ "from": "18:00:00", "to": "23:59:59" }],
+    "wednesday": [{ "from": "18:00:00", "to": "23:59:59" }],
+    "thursday": [{ "from": "18:00:00", "to": "23:59:59" }],
+    "friday": [{ "from": "18:00:00", "to": "24:00:00" }],
+    "saturday": [{ "from": "18:00:00", "to": "24:00:00" }]
+  },
+  {
+    "id": "hot_plate_shabbat",
+    "name": "פלטה",
+    "sunday": [], "monday": [], "tuesday": [], "wednesday": [], "thursday": [],
+    "friday": [{ "from": "15:00:00", "to": "24:00:00" }],
+    "saturday": [{ "from": "00:00:00", "to": "19:00:00" }]
+  }
+]

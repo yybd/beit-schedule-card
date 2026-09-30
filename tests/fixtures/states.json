@@ -1,0 +1,601 @@
+[
+ {
+  "entity_id": "climate.living_room_ac",
+  "state": "off",
+  "attributes": {
+   "hvac_modes": [
+    "off",
+    "cool",
+    "heat",
+    "dry",
+    "fan_only"
+   ],
+   "min_temp": 16,
+   "max_temp": 30,
+   "target_temp_step": 1,
+   "temperature": 24,
+   "current_temperature": 26,
+   "friendly_name": "מזגן סלון",
+   "supported_features": 393
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "climate.bedroom_ac",
+  "state": "cool",
+  "attributes": {
+   "hvac_modes": [
+    "off",
+    "cool",
+    "heat",
+    "dry",
+    "fan_only"
+   ],
+   "min_temp": 16,
+   "max_temp": 30,
+   "target_temp_step": 1,
+   "temperature": 23,
+   "current_temperature": 24,
+   "friendly_name": "מזגן חדר שינה",
+   "supported_features": 393
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "climate.kids_ac",
+  "state": "off",
+  "attributes": {
+   "hvac_modes": [
+    "off",
+    "cool",
+    "heat"
+   ],
+   "min_temp": 17,
+   "max_temp": 30,
+   "temperature": 25,
+   "current_temperature": 25.5,
+   "friendly_name": "מזגן ילדים",
+   "supported_features": 393
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "light.balcony",
+  "state": "off",
+  "attributes": {
+   "supported_color_modes": [
+    "brightness"
+   ],
+   "color_mode": null,
+   "brightness": null,
+   "friendly_name": "תאורת מרפסת",
+   "supported_features": 0
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "light.living_room",
+  "state": "on",
+  "attributes": {
+   "supported_color_modes": [
+    "color_temp"
+   ],
+   "color_mode": "color_temp",
+   "brightness": 180,
+   "friendly_name": "תאורת סלון",
+   "supported_features": 40
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "light.kitchen_strip",
+  "state": "off",
+  "attributes": {
+   "supported_color_modes": [
+    "onoff"
+   ],
+   "color_mode": null,
+   "friendly_name": "פס לד מטבח",
+   "supported_features": 0
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "switch.hot_plate",
+  "state": "off",
+  "attributes": {
+   "device_class": "outlet",
+   "friendly_name": "פלטה"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "switch.night_light",
+  "state": "off",
+  "attributes": {
+   "friendly_name": "מנורת לילה"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "switch.living_room_ac_display",
+  "state": "on",
+  "attributes": {
+   "friendly_name": "מזגן סלון תצוגה"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "water_heater.boiler",
+  "state": "off",
+  "attributes": {
+   "min_temp": 40,
+   "max_temp": 75,
+   "temperature": 55,
+   "current_temperature": 38,
+   "operation_list": [
+    "off",
+    "electric"
+   ],
+   "friendly_name": "דוד חשמל",
+   "supported_features": 3
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "cover.bedroom_shutter",
+  "state": "open",
+  "attributes": {
+   "current_position": 100,
+   "device_class": "shutter",
+   "friendly_name": "תריס חדר שינה",
+   "supported_features": 15
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "media_player.kitchen_speaker",
+  "state": "idle",
+  "attributes": {
+   "friendly_name": "רמקול מטבח",
+   "supported_features": 152463
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "sensor.living_room_temperature",
+  "state": "26.1",
+  "attributes": {
+   "device_class": "temperature",
+   "unit_of_measurement": "°C",
+   "friendly_name": "טמפרטורה סלון"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "schedule.pool_pump",
+  "state": "off",
+  "attributes": {
+   "editable": false,
+   "next_event": "2026-01-05T06:00:00+02:00",
+   "friendly_name": "משאבת בריכה"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "automation.beit_living_room_ac_shabbat",
+  "state": "on",
+  "attributes": {
+   "id": "1767000000001",
+   "mode": "queued",
+   "current": 0,
+   "last_triggered": null,
+   "friendly_name": "Beit · מזגן סלון שבת"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "automation.living_room_fan_shabbat",
+  "state": "on",
+  "attributes": {
+   "id": "1600000000001",
+   "mode": "single",
+   "current": 0,
+   "last_triggered": null,
+   "friendly_name": "מאוורר סלון בשבת"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "automation.beit_bedroom_ac_shabbat",
+  "state": "off",
+  "attributes": {
+   "id": "1767000000002",
+   "mode": "queued",
+   "current": 0,
+   "last_triggered": null,
+   "friendly_name": "Beit · מזגן חדר שינה שבת"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "automation.beit_hot_plate_shabbat",
+  "state": "on",
+  "attributes": {
+   "id": "1767000000003",
+   "mode": "queued",
+   "current": 0,
+   "last_triggered": null,
+   "friendly_name": "Beit · פלטה"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "automation.beit_kids_ac_chag",
+  "state": "off",
+  "attributes": {
+   "id": "1767000000004",
+   "mode": "queued",
+   "current": 0,
+   "last_triggered": null,
+   "friendly_name": "Beit · מזגן ילדים חג"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "automation.beit_water_heater_weekdays",
+  "state": "on",
+  "attributes": {
+   "id": "1767000000005",
+   "mode": "queued",
+   "current": 0,
+   "last_triggered": null,
+   "friendly_name": "Beit · דוד מים"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "automation.balcony_light_evening",
+  "state": "on",
+  "attributes": {
+   "id": "1600000000002",
+   "mode": "single",
+   "current": 0,
+   "last_triggered": null,
+   "friendly_name": "תאורת מרפסת בערב"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "automation.pool_pump",
+  "state": "on",
+  "attributes": {
+   "id": "1600000000003",
+   "mode": "single",
+   "current": 0,
+   "last_triggered": null,
+   "friendly_name": "משאבת בריכה"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "automation.morning_music",
+  "state": "off",
+  "attributes": {
+   "id": "1600000000004",
+   "mode": "single",
+   "current": 0,
+   "last_triggered": null,
+   "friendly_name": "מוזיקה בבוקר"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "binary_sensor.jewish_calendar_issur_melacha_in_effect_2",
+  "state": "off",
+  "attributes": {
+   "friendly_name": "Jewish Calendar Issur Melacha in effect"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "binary_sensor.jewish_calendar_erev_shabbat_hag_2",
+  "state": "off",
+  "attributes": {
+   "friendly_name": "Jewish Calendar Erev Shabbat/Hag"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "binary_sensor.jewish_calendar_motzei_shabbat_hag_2",
+  "state": "off",
+  "attributes": {
+   "friendly_name": "Jewish Calendar Motzei Shabbat/Hag"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "sensor.jewish_calendar_upcoming_candle_lighting_2",
+  "state": "2026-01-09T14:26:00+00:00",
+  "attributes": {
+   "device_class": "timestamp",
+   "friendly_name": "Jewish Calendar Upcoming candle lighting"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "sensor.jewish_calendar_upcoming_havdalah_2",
+  "state": "2026-01-10T15:44:00+00:00",
+  "attributes": {
+   "device_class": "timestamp",
+   "friendly_name": "Jewish Calendar Upcoming Havdalah"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "sensor.jewish_calendar_date_2",
+  "state": "ט״ו טבת תשפ״ו",
+  "attributes": {
+   "friendly_name": "Jewish Calendar Date"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "sensor.jewish_calendar_weekly_torah_portion_2",
+  "state": "שמות",
+  "attributes": {
+   "friendly_name": "Jewish Calendar Parshat Hashavua"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "sensor.jewish_calendar_holiday_2",
+  "state": "",
+  "attributes": {
+   "friendly_name": "Jewish Calendar Holiday"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "sensor.hebcal_is_shabbat",
+  "state": "False",
+  "attributes": {
+   "friendly_name": "האם שבת"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "sensor.hebcal_hebrew_date",
+  "state": "יום ראשון, ט״ו בטבת תשפ״ו",
+  "attributes": {
+   "friendly_name": "תאריך עברי"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "sensor.hebcal_parasha",
+  "state": "שמות",
+  "attributes": {
+   "friendly_name": "פרשת השבוע"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
+  "entity_id": "sensor.hebcal_is_yomtov",
+  "state": "אין מידע",
+  "attributes": {
+   "friendly_name": "האם יום טוב"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ }
+]
