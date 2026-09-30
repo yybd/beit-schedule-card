@@ -11,7 +11,7 @@
  * Custom elements are registered only where `customElements` exists.
  */
 
-export const VERSION = '1.0.1';
+export const VERSION = '1.0.2';
 
 // ---------------------------------------------------------------------------- week model
 
@@ -1692,6 +1692,7 @@ const EDITOR_STYLE = `
   .day:last-child { border-bottom: 0; }
   .day-line { display: flex; align-items: center; gap: 8px; }
   .day-line .dname { width: 52px; flex: none; font-size: 14px; }
+  dialog.editor[dir=ltr] .day-line .dname { width: 88px; } /* "Wednesday" */
   .ranges { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
   .range { display: inline-flex; align-items: center; border-radius: 16px; background: color-mix(in srgb, var(--primary-color) 16%, transparent); }
   .range button { border: 0; background: transparent; cursor: pointer; padding: 5px 4px 5px 12px; font-size: 14px; font-variant-numeric: tabular-nums; }
