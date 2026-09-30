@@ -86,3 +86,12 @@ test('cssHeight: a bare number is pixels, other units pass through, empty is aut
   assert.equal(cssHeight(''), null);
   assert.equal(cssHeight(undefined), null);
 });
+
+import { parseTimeInput } from '../dist/beit-schedule-card.js';
+
+test('parseTimeInput reads 24-hour times however they are typed', () => {
+  const cases = { '7': 420, '07': 420, '7:30': 450, '07:30': 450, '730': 450, '0730': 450, '2330': 1410, '23.30': 1410,
+    '0': 0, '00:00': 0, '24:00': 1440, '24': 1440, ' 9:05 ': 545 };
+  for (const [text, minutes] of Object.entries(cases)) assert.equal(parseTimeInput(text), minutes, text);
+  for (const bad of ['', 'x', '25:00', '24:30', '7:60', '12345', '7:3', 'am', '-1']) assert.equal(parseTimeInput(bad), null, bad);
+});

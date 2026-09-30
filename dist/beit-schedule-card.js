@@ -38,6 +38,24 @@ export function formatBlock(m) {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00`;
 }
 
+/**
+ * A time as typed, always 24-hour: "7", "07", "730", "0730", "7:30", "07.30", "24:00". Minutes from midnight, or null.
+ * 24:00 (1440) is allowed; the caller decides where it makes sense.
+ */
+export function parseTimeInput(text) {
+  const v = String(text ?? '').trim().replace(/[.,;]/g, ':');
+  let m = v.match(/^(\d{1,2})(?::(\d{2}))?$/);
+  if (!m) {
+    const digits = v.match(/^(\d{3,4})$/)?.[1];
+    if (digits) m = [digits, digits.slice(0, -2), digits.slice(-2)];
+  }
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = m[2] === undefined ? 0 : Number(m[2]);
+  if (h > 24 || min > 59 || (h === 24 && min !== 0)) return null;
+  return h * 60 + min;
+}
+
 /** Minutes → "HH:MM" for display; 1440 → "24:00". */
 export const hm = (m) => formatBlock(m).slice(0, 5);
 
@@ -695,7 +713,8 @@ export const STRINGS = {
     addRange: 'טווח',
     from: 'מ־',
     to: 'עד',
-    midnightHint: 'סיום 00:00 = עד חצות',
+    midnightHint: 'שעון 24 שעות; סיום 00:00 או 24:00 = עד חצות',
+    errTime: 'שעה לא תקינה — כתבו למשל 7:30 או 2330',
     ok: 'אישור',
     cancel: 'ביטול',
     copyTo: (day) => `להעתיק את יום ${day} אל…`,
@@ -806,7 +825,8 @@ export const STRINGS = {
     addRange: 'Range',
     from: 'From',
     to: 'To',
-    midnightHint: 'An end of 00:00 means until midnight',
+    midnightHint: '24-hour clock; an end of 00:00 or 24:00 means until midnight',
+    errTime: 'Not a time. Type e.g. 7:30 or 2330',
     ok: 'OK',
     cancel: 'Cancel',
     copyTo: (day) => `Copy ${day} to…`,
@@ -1262,10 +1282,6 @@ class BeitScheduleCard extends BeitCardBase {
 
 // ---------------------------------------------------------------------------- the editor dialog
 
-const toMinutes = (v) => {
-  const [h, m] = String(v || '').split(':').map((x) => parseInt(x, 10));
-  return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null;
-};
 
 /** Create a schedule for a device, or edit the week of an existing one. Lives in a <dialog> in the card's shadow root. */
 class ScheduleEditor {
@@ -1313,6 +1329,12 @@ class ScheduleEditor {
     dlg.addEventListener('click', (e) => this.onClick(e));
     dlg.addEventListener('change', (e) => this.onChange(e));
     dlg.addEventListener('input', (e) => this.onInput(e));
+    dlg.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.target.id === 'from' || e.target.id === 'to')) {
+        e.preventDefault();
+        this.dlg.querySelector('[data-act=rangeOk]')?.click();
+      }
+    });
     dlg.addEventListener('cancel', (e) => {
       e.preventDefault();
       this.back();
@@ -1523,9 +1545,11 @@ class ScheduleEditor {
       const b = this.rangeEdit.index != null ? blocks[this.rangeEdit.index] : { start: 8 * 60, end: 9 * 60 };
       panel = `<div class="panel" role="group" aria-label="${esc(t.editRange)}">
         <div class="times" dir="ltr">
-          <label><span>${esc(t.from)}</span><input type="time" step="60" id="from" value="${hm(b.start)}" data-autofocus></label>
+          <label><span>${esc(t.from)}</span><input type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="HH:MM" id="from"
+            value="${esc(this.rangeEdit.from ?? hm(b.start))}" data-autofocus></label>
           <span aria-hidden="true">–</span>
-          <label><span>${esc(t.to)}</span><input type="time" step="60" id="to" value="${b.end === 1440 ? '00:00' : hm(b.end)}"></label>
+          <label><span>${esc(t.to)}</span><input type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="HH:MM" id="to"
+            value="${esc(this.rangeEdit.to ?? hm(b.end))}"></label>
         </div>
         ${this.rangeEdit.error ? `<div class="error small" role="alert">${esc(this.rangeEdit.error)}</div>` : ''}
         <div class="actions"><button class="btn" data-act="rangeCancel">${esc(t.cancel)}</button><button class="btn primary" data-act="rangeOk">${esc(t.ok)}</button></div>
@@ -1623,10 +1647,17 @@ class ScheduleEditor {
       case 'remove': w.days[DAYS[day]] = w.days[DAYS[day]].filter((_, k) => k !== index); this.rangeEdit = null; break;
       case 'rangeCancel': this.rangeEdit = null; break;
       case 'rangeOk': {
-        const start = toMinutes(this.dlg.querySelector('#from').value);
-        let end = toMinutes(this.dlg.querySelector('#to').value);
+        const from = this.dlg.querySelector('#from').value;
+        const to = this.dlg.querySelector('#to').value;
+        Object.assign(this.rangeEdit, { from, to }); // kept if the panel is drawn again with an error
+        const start = parseTimeInput(from);
+        let end = parseTimeInput(to);
         if (end === 0) end = 1440; // "until midnight"
-        if (start == null || end == null || end <= start) {
+        if (start == null || end == null || start >= 1440) {
+          this.rangeEdit.error = this.t.errTime;
+          break;
+        }
+        if (end <= start) {
           this.rangeEdit.error = this.t.errRange;
           break;
         }
@@ -1820,7 +1851,8 @@ const EDITOR_STYLE = `
     display: flex; flex-direction: column; gap: 10px; }
   .times { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
   .times label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--secondary-text-color); }
-  .times input { font-size: 16px; color: var(--primary-text-color); background: var(--card-background-color); }
+  .times input { font-size: 16px; color: var(--primary-text-color); background: var(--card-background-color); width: 6.5em;
+    text-align: center; font-variant-numeric: tabular-nums; }
   .actions { display: flex; gap: 8px; justify-content: flex-end; }
   .copy-days { display: flex; flex-wrap: wrap; gap: 6px 16px; }
   .search { display: flex; align-items: center; gap: 8px; position: sticky; top: -16px; background: var(--card-background-color); padding: 4px 0 8px; z-index: 1; }
