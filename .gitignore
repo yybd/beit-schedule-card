@@ -2,3 +2,5 @@ node_modules/
 # Local dev server settings (HA url + token). Never commit.
 dev.env.json
 .DS_Store
+# Messages for testers: kept locally, not published.
+WHATSAPP.md
