@@ -344,7 +344,8 @@ test('the start of an automatic mode: a time of day, or hours before candle ligh
       assert.deepEqual(parseAutoStart(buildAutoModeAutomation({ id: '1', mode, labelId: 'l', start, cal })), start, `${mode} ${JSON.stringify(start)}`);
     }
   }
-  assert.equal(startText({ hoursBefore: 3 }), '3 שעות לפני הדלקת הנרות');
+  assert.equal(startText({ hoursBefore: 3 }, 'he'), '3 שעות לפני הדלקת הנרות');
+  assert.equal(startText({ hoursBefore: 3 }), '3 hours before candle lighting');
   assert.equal(startText({ at: '12:00' }, 'en'), 'at 12:00');
 });
 

@@ -11,7 +11,7 @@
  * Custom elements are registered only where `customElements` exists.
  */
 
-export const VERSION = '1.2.1';
+export const VERSION = '1.2.2';
 
 // ---------------------------------------------------------------------------- week model
 
@@ -98,12 +98,12 @@ export class WeekSchedule {
   }
 
   /** Why HA would reject this week, in words; null when it is valid. */
-  validate(lang = 'he') {
-    const t = STRINGS[lang] || STRINGS.he;
+  validate(lang = 'en') {
+    const t = STRINGS[lang] || STRINGS.en;
     if (!this.name.trim()) return t.errName;
     for (let i = 0; i < DAYS.length; i++) {
       const blocks = [...this.days[DAYS[i]]].sort(byStart);
-      const day = (DAY_NAMES[lang] || DAY_NAMES.he)[i];
+      const day = (DAY_NAMES[lang] || DAY_NAMES.en)[i];
       for (let k = 0; k < blocks.length; k++) {
         if (blocks[k].end <= blocks[k].start) return t.errReversed(day);
         if (k > 0 && blocks[k].start < blocks[k - 1].end) return t.errOverlap(day);
@@ -355,7 +355,7 @@ export function parseAutoStart(config) {
 }
 
 /** "at 12:00" / "3 hours before candle lighting", as the description and the card say it. */
-export function startText(start, lang = 'he') {
+export function startText(start, lang = 'en') {
   if (start?.hoursBefore != null) {
     const n = Number(start.hoursBefore);
     return lang === 'he' ? (n === 1 ? 'שעה לפני הדלקת הנרות' : `${n} שעות לפני הדלקת הנרות`) : `${n} hour${n === 1 ? '' : 's'} before candle lighting`;
@@ -372,9 +372,9 @@ function erevChagTemplate(cal) {
 function autoDescription(mode, start, endTrigger) {
   const source = String(endTrigger.entity_id[0]).includes('hebcal') ? 'Hebcal' : 'Jewish Calendar';
   return mode === 'שבת'
-    ? `${BEIT_MARKER} — מדליק את כל האוטומציות עם התווית "שבת" בשישי ${startText(start)} (לפני התזמונים של אחר הצהריים), ` +
+    ? `${BEIT_MARKER} — מדליק את כל האוטומציות עם התווית "שבת" בשישי ${startText(start, 'he')} (לפני התזמונים של אחר הצהריים), ` +
       `ומכבה אותן ביציאת השבת לפי ${source}, אחרי שכל תזמוני השבת הסתיימו.`
-    : `${BEIT_MARKER} — מדליק את כל האוטומציות עם התווית "חג" בערב חג ${startText(start)}, ` +
+    : `${BEIT_MARKER} — מדליק את כל האוטומציות עם התווית "חג" בערב חג ${startText(start, 'he')}, ` +
       `ומכבה אותן בצאת החג לפי Jewish Calendar, אחרי שכל תזמוני החג הסתיימו. חג שחל בשבת מכוסה במצב שבת.`;
 }
 
@@ -765,8 +765,9 @@ export async function enableAuto(hass, mode, { start = DEFAULT_AUTO_START, waitO
     return existing.entityId;
   }
   const cal = findCalendar(hass.states);
-  if (!autoAvailable(mode, cal)) throw new Error(mode === 'שבת' ? STRINGS.he.errNoCalendar : STRINGS.he.errNoJewishCalendar);
-  if (!autoStartTrigger(mode, start, cal)) throw new Error(STRINGS.he.errNoCandleSensor);
+  const t = STRINGS[langOf(hass)];
+  if (!autoAvailable(mode, cal)) throw new Error(mode === 'שבת' ? t.errNoCalendar : t.errNoJewishCalendar);
+  if (!autoStartTrigger(mode, start, cal)) throw new Error(t.errNoCandleSensor);
   const label = await ensureLabel(hass, mode);
   const id = String(Date.now());
   await hass.callApi('POST', `config/automation/config/${id}`, buildAutoModeAutomation({ id, mode, labelId: label.label_id, start, cal }));
@@ -791,12 +792,13 @@ export async function disableAuto(hass, mode) {
  */
 export async function setAutoStart(hass, mode, start) {
   const existing = await findAuto(hass, mode);
-  if (!existing?.ours || existing.config?.id == null) throw new Error(STRINGS.he.autoShabbatNotOurs);
+  const t = STRINGS[langOf(hass)];
+  if (!existing?.ours || existing.config?.id == null) throw new Error(t.autoShabbatNotOurs);
   const cfg = existing.config;
   const trigger = autoStartTrigger(mode, start, findCalendar(hass.states));
-  if (!trigger) throw new Error(STRINGS.he.errNoCandleSensor);
+  if (!trigger) throw new Error(t.errNoCandleSensor);
   const index = (cfg.triggers || []).findIndex((x) => x?.id === START_ID[mode]);
-  if (index < 0) throw new Error(STRINGS.he.autoShabbatNotOurs);
+  if (index < 0) throw new Error(t.autoShabbatNotOurs);
   const old = parseAutoStart(cfg);
   const end = cfg.triggers.find((x) => x?.id === END_ID[mode]);
   const next = { ...cfg, triggers: cfg.triggers.map((x, i) => (i === index ? trigger : x)) };
@@ -864,7 +866,7 @@ export const PICKABLE_DOMAINS = ['light', 'switch', 'fan', 'cover', 'climate', '
  * ones with no area. Hidden and auxiliary (config/diagnostic) entities are left out, as the app does.
  * `display` is `config/entity_registry/list_for_display`.
  */
-export function deviceSections({ states, display, devices = [], areas = [], domains = null, only = null }, query = '', noAreaTitle = 'ללא חדר', lang = 'he') {
+export function deviceSections({ states, display, devices = [], areas = [], domains = null, only = null }, query = '', noAreaTitle = 'No room', lang = 'en') {
   const meta = Object.fromEntries((display?.entities || []).map((e) => [e.ei, e]));
   const deviceArea = Object.fromEntries(devices.map((d) => [d.id, d.area_id]));
   const q = query.trim().toLowerCase();
@@ -902,7 +904,7 @@ const VERBS = {
 };
 
 /** "בתחילת הטווח: נדלק (קירור, 24°) · בסופו: נכבה": what a target does, in words. */
-export function actionSummary(target, lang = 'he') {
+export function actionSummary(target, lang = 'en') {
   const t = STRINGS[lang];
   const v = VERBS[lang];
   const domain = domainOf(target.entityId);
@@ -1221,10 +1223,11 @@ export function cssHeight(value) {
   return /^\d+(\.\d+)?$/.test(v) ? `${v}px` : v;
 }
 
-export const langOf = (hass) => (String(hass?.locale?.language || hass?.language || 'he').startsWith('he') ? 'he' : 'en');
+/** The user's language in HA's profile: Hebrew ('he', or the old 'iw') gets Hebrew; anything else, or none, English. */
+export const langOf = (hass) => (/^(he|iw)\b/.test(String(hass?.locale?.language || hass?.language || 'en')) ? 'he' : 'en');
 
 /** "היום ב-16:00" / "tomorrow at 16:00" / "ביום שישי ב-16:00". */
-export function formatWhen(date, now = new Date(), lang = 'he') {
+export function formatWhen(date, now = new Date(), lang = 'en') {
   const t = STRINGS[lang];
   const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   const midnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -2328,7 +2331,7 @@ const SCHEDULE_STYLE = `
 // ---------------------------------------------------------------------------- beit-shabbat-card
 
 /** What the calendar block shows, from findCalendar: Jewish Calendar values first, Hebcal's where it has none. */
-export function calendarRows(states, cal, lang = 'he', now = new Date()) {
+export function calendarRows(states, cal, lang = 'en', now = new Date()) {
   const t = STRINGS[lang];
   const val = (id) => (id && usable(states[id]) ? String(states[id].state) : null);
   const when = (id, hebcalId) => {

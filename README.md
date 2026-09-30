@@ -67,12 +67,14 @@ The package contains **two separate cards**. Add one or both; each works on its 
 
 ### Both
 
-- **Hebrew first.** Full right-to-left layout and a week that starts on Sunday. English is also supported.
+- **English and Hebrew.** The cards follow the language in each user's Home Assistant profile: Hebrew gets a full
+  right-to-left layout, anything else English. The week starts on Sunday.
 - **Visual editors.** Both cards are set up from the dashboard's own card editor; no YAML needed.
 
 ## Screenshots
 
-All screenshots use the invented house in `tests/fixtures`, in English. The cards are Hebrew-first: in Hebrew, the whole layout is right to left.
+All screenshots use the invented house in `tests/fixtures`, in English. For a user whose Home Assistant language is
+Hebrew, the cards are in Hebrew and the whole layout is right to left.
 
 | Editing a schedule | A new schedule for an air conditioner |
 |:-:|:-:|

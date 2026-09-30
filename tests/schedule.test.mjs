@@ -32,9 +32,9 @@ test('round-trips HA schedule JSON, including 24:00 and 23:59:59 ends', () => {
 
 test('rejects overlaps and reversed blocks', () => {
   const w = new WeekSchedule({ name: 'x', days: { monday: [{ start: 600, end: 720 }, { start: 700, end: 800 }] } });
-  assert.match(w.validate(), /חופפים/);
+  assert.match(w.validate('he'), /חופפים/);
   const r = new WeekSchedule({ name: 'x', days: { monday: [{ start: 700, end: 600 }] } });
-  assert.match(r.validate(), /לפני/);
+  assert.match(r.validate('he'), /לפני/);
   assert.notEqual(new WeekSchedule({ name: ' ' }).validate(), null);
 });
 

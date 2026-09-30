@@ -5,9 +5,9 @@ import { formatWhen, langOf } from '../dist/beit-schedule-card.js';
 
 test('formatWhen: today, tomorrow, a weekday', () => {
   const now = new Date(2026, 0, 4, 9, 0); // Sunday
-  assert.equal(formatWhen(new Date(2026, 0, 4, 16, 5), now), 'היום ב-16:05');
-  assert.equal(formatWhen(new Date(2026, 0, 5, 6, 0), now), 'מחר ב-06:00');
-  assert.equal(formatWhen(new Date(2026, 0, 9, 16, 0), now), 'ביום שישי ב-16:00');
+  assert.equal(formatWhen(new Date(2026, 0, 4, 16, 5), now, 'he'), 'היום ב-16:05');
+  assert.equal(formatWhen(new Date(2026, 0, 5, 6, 0), now, 'he'), 'מחר ב-06:00');
+  assert.equal(formatWhen(new Date(2026, 0, 9, 16, 0), now, 'he'), 'ביום שישי ב-16:00');
   assert.equal(formatWhen(new Date(2026, 0, 9, 16, 0), now, 'en'), 'Friday at 16:00');
   assert.equal(formatWhen(new Date(2026, 0, 5, 6, 0), now, 'en'), 'tomorrow at 06:00');
 });
@@ -16,7 +16,10 @@ test('langOf reads hass.locale, then hass.language', () => {
   assert.equal(langOf({ locale: { language: 'he' } }), 'he');
   assert.equal(langOf({ language: 'en-GB' }), 'en');
   assert.equal(langOf({ locale: { language: 'fr' } }), 'en');
-  assert.equal(langOf(undefined), 'he');
+  assert.equal(langOf({ language: 'iw' }), 'he');
+  // No language known: English.
+  assert.equal(langOf(undefined), 'en');
+  assert.equal(langOf({}), 'en');
 });
 
 import { readFileSync } from 'node:fs';
@@ -114,8 +117,8 @@ test('deviceSections honours the card device_domains and the picker type chip', 
 import { actionSummary } from '../dist/beit-schedule-card.js';
 
 test('actionSummary says what a schedule does to its device', () => {
-  assert.equal(actionSummary({ entityId: 'climate.a', hvacMode: 'cool', temperature: 24 }), 'בתחילת הטווח: נדלק (קירור, 24°) · בסופו: נכבה');
-  assert.equal(actionSummary({ entityId: 'cover.c' }), 'בתחילת הטווח: נפתח · בסופו: נסגר');
-  assert.equal(actionSummary({ entityId: 'light.l', brightnessPct: 40, turnOffAtEnd: false }), 'בתחילת הטווח: נדלק (40%) · בסופו: נשאר כמו שהוא');
+  assert.equal(actionSummary({ entityId: 'climate.a', hvacMode: 'cool', temperature: 24 }, 'he'), 'בתחילת הטווח: נדלק (קירור, 24°) · בסופו: נכבה');
+  assert.equal(actionSummary({ entityId: 'cover.c' }, 'he'), 'בתחילת הטווח: נפתח · בסופו: נסגר');
+  assert.equal(actionSummary({ entityId: 'light.l', brightnessPct: 40, turnOffAtEnd: false }, 'he'), 'בתחילת הטווח: נדלק (40%) · בסופו: נשאר כמו שהוא');
   assert.equal(actionSummary({ entityId: 'switch.s' }, 'en'), 'When a range starts: turns on · when it ends: turns off');
 });
