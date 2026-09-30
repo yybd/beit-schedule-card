@@ -21,6 +21,10 @@ export const DAY_NAMES = {
   he: ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'],
   en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
 };
+export const DAY_SHORT = {
+  he: ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'],
+  en: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
+};
 
 /** "HH:MM[:SS]" → minutes from midnight. "24:00:00" is 1440, and so is "23:59:59". Minute precision. */
 export function parseBlock(hms) {
@@ -529,34 +533,410 @@ export const STRINGS = {
     errReversed: (day) => `ביום ${day}: שעת הסיום לפני שעת ההתחלה`,
     errOverlap: (day) => `ביום ${day}: יש טווחים חופפים`,
     errNoCalendar: 'לא נמצא לוח שנה עברי (Jewish Calendar או Hebcal) — אין לפי מה לדעת מתי השבת יוצאת',
+    schedules: 'תזמונים',
+    newSchedule: 'תזמון חדש',
+    onNow: 'פועל עכשיו',
+    offNow: 'כבוי',
+    starts: 'מתחיל',
+    ends: 'נגמר',
+    today: 'היום',
+    tomorrow: 'מחר',
+    onDay: (day) => `ביום ${day}`,
+    at: (when, time) => `${when} ב-${time}`,
+    yaml: 'מוגדר ב-YAML — לקריאה בלבד',
+    noSchedules: 'אין תזמונים להצגה',
+    loading: 'טוען…',
+    readOnly: 'צפייה בלבד — רק מנהל יכול לערוך',
+    modeName: { שבת: 'שבת', חג: 'חג' },
   },
   en: {
     errName: 'The schedule needs a name',
     errReversed: (day) => `${day}: a range ends before it starts`,
     errOverlap: (day) => `${day}: ranges overlap`,
     errNoCalendar: 'No Jewish calendar found (Jewish Calendar or Hebcal), so there is no way to tell when Shabbat ends',
+    schedules: 'Schedules',
+    newSchedule: 'New schedule',
+    onNow: 'On now',
+    offNow: 'Off',
+    starts: 'starts',
+    ends: 'ends',
+    today: 'today',
+    tomorrow: 'tomorrow',
+    onDay: (day) => day,
+    at: (when, time) => `${when} at ${time}`,
+    yaml: 'Defined in YAML — read only',
+    noSchedules: 'No schedules to show',
+    loading: 'Loading…',
+    readOnly: 'View only — only an administrator can edit',
+    modeName: { שבת: 'Shabbat', חג: 'Chag' },
   },
 };
 
-// ---------------------------------------------------------------------------- cards
+export const langOf = (hass) => (String(hass?.locale?.language || hass?.language || 'he').startsWith('he') ? 'he' : 'en');
 
-class BeitScheduleCard extends (globalThis.HTMLElement || class {}) {
-  setConfig(config) {
-    this._config = config || {};
-    this.innerHTML = '<ha-card><div style="padding:16px">Beit Schedule Card</div></ha-card>';
+/** "היום ב-16:00" / "tomorrow at 16:00" / "ביום שישי ב-16:00". */
+export function formatWhen(date, now = new Date(), lang = 'he') {
+  const t = STRINGS[lang];
+  const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  const midnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((midnight(date) - midnight(now)) / 86400000);
+  const when = days === 0 ? t.today : days === 1 ? t.tomorrow : t.onDay(DAY_NAMES[lang][date.getDay()]);
+  return t.at(when, time);
+}
+
+// ---------------------------------------------------------------------------- UI helpers
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+// Material Design Icons paths (Apache 2.0), inlined: HA's own icon elements are not ours to depend on.
+const ICONS = {
+  plus: 'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z',
+  close: 'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z',
+  lock: 'M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z',
+  delete: 'M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z',
+  copy: 'M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z',
+  search: 'M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z',
+  clock: 'M12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22C6.47,22 2,17.5 2,12A10,10 0 0,1 12,2M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z',
+  alert: 'M13,14H11V10H13M13,18H11V16H13M1,21H23L12,2L1,21Z',
+  checklist: 'M3,5H9V11H3V5M5,7V9H7V7H5M11,7H21V9H11V7M11,15H21V17H11V15M5,20L1.5,16.5L2.91,15.09L5,17.17L9.59,12.59L11,14L5,20Z',
+  minus: 'M19,13H5V11H19V13Z',
+};
+const icon = (name, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
+const MODE_GLYPH = { שבת: '🕯️', חג: '✡️' };
+
+const BASE_STYLE = `
+  :host { display: block; }
+  ha-card { overflow: hidden; }
+  * { box-sizing: border-box; }
+  .ic { width: 20px; height: 20px; fill: currentColor; flex: none; }
+  button { font: inherit; color: inherit; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 18px; cursor: pointer;
+    border: 1px solid var(--divider-color); background: transparent; color: var(--primary-color); font-size: 14px; font-weight: 500; }
+  .btn.primary { background: var(--primary-color); color: var(--text-primary-color, #fff); border-color: var(--primary-color); }
+  .btn.danger { color: var(--error-color, #db4437); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%;
+    border: 0; background: transparent; cursor: pointer; color: var(--secondary-text-color); flex: none; }
+  .icon-btn:hover, .btn:hover { background: color-mix(in srgb, var(--primary-color) 10%, transparent); }
+  .btn.primary:hover { filter: brightness(1.08); background: var(--primary-color); }
+  :focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+  .header { display: flex; align-items: center; gap: 8px; padding: 16px 16px 8px; }
+  .header h2 { margin: 0; flex: 1; font-size: 20px; font-weight: 500; color: var(--ha-card-header-color, var(--primary-text-color)); }
+  .muted { color: var(--secondary-text-color); }
+  .small { font-size: 12px; }
+  .hint { color: var(--secondary-text-color); font-size: 13px; padding: 8px 16px 16px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 10px; font-size: 12px; line-height: 18px;
+    background: color-mix(in srgb, var(--chip-color, var(--primary-color)) 16%, transparent); color: var(--primary-text-color); white-space: nowrap; }
+  .chip.shabbat { --chip-color: #ffa000; }
+  .chip.chag { --chip-color: #5c6bc0; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--disabled-text-color, #9e9e9e); flex: none; }
+  .dot.on { background: var(--success-color, #43a047); }
+  /* a switch built from a checkbox */
+  .switch { position: relative; display: inline-block; width: 36px; height: 20px; flex: none; }
+  .switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+  .switch .track { position: absolute; inset: 3px 0; border-radius: 7px; background: var(--switch-unchecked-track-color, #9e9e9e); opacity: .5; transition: .15s; }
+  .switch .knob { position: absolute; top: 0; inset-inline-start: 0; width: 20px; height: 20px; border-radius: 50%;
+    background: var(--switch-unchecked-button-color, #fafafa); box-shadow: 0 1px 3px rgba(0,0,0,.4); transition: .15s; }
+  .switch input:checked ~ .track { background: var(--switch-checked-track-color, var(--primary-color)); }
+  .switch input:checked ~ .knob { inset-inline-start: 16px; background: var(--switch-checked-button-color, var(--primary-color)); }
+  .switch.partial input ~ .knob { inset-inline-start: 8px; background: var(--switch-checked-button-color, var(--primary-color)); }
+  .switch input:disabled { cursor: default; }
+  .switch input:disabled ~ .knob, .switch input:disabled ~ .track { opacity: .35; }
+  .switch input:focus-visible ~ .knob { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+  .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 10; max-width: min(560px, calc(100vw - 32px));
+    background: var(--primary-text-color); color: var(--card-background-color, #fff); padding: 10px 16px; border-radius: 8px; font-size: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+  .toast[hidden] { display: none; }
+`;
+
+const switchHtml = ({ checked = false, partial = false, disabled = false, label = '', attrs = '' } = {}) =>
+  `<span class="switch ${partial ? 'partial' : ''}"><input type="checkbox" role="switch" ${checked ? 'checked' : ''}
+    aria-checked="${partial ? 'mixed' : checked}" ${disabled ? 'disabled' : ''} aria-label="${esc(label)}" ${attrs}>
+    <span class="track"></span><span class="knob"></span></span>`;
+
+const Base = globalThis.HTMLElement || class {};
+
+/** What both cards share: shadow root, language, a live adapter over hass for the ops, the label registry, a toast. */
+class BeitCardBase extends Base {
+  constructor() {
+    super();
+    // The ops wait for entities to appear, so they need the latest hass, not the one they started with.
+    const self = this;
+    this._h = {
+      callWS: (m) => self._hass.callWS(m),
+      callApi: (...a) => self._hass.callApi(...a),
+      callService: (...a) => self._hass.callService(...a),
+      get states() {
+        return self._hass?.states || {};
+      },
+    };
+    this._labels = null;
+    this._displayLabels = null;
   }
 
-  set hass(hass) {
-    this._hass = hass;
+  get _lang() {
+    return langOf(this._hass);
   }
 
-  getCardSize() {
-    return 1;
+  get _t() {
+    return STRINGS[this._lang];
+  }
+
+  get _isAdmin() {
+    return this._hass?.user?.is_admin !== false;
+  }
+
+  _root() {
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+    return this.shadowRoot;
+  }
+
+  /** Labels by name, and each entity's labels: from hass.entities when HA provides them, else list_for_display. */
+  _registry() {
+    const ents = this._hass?.entities;
+    const entityLabels = {};
+    if (ents && Object.keys(ents).length) {
+      for (const [id, e] of Object.entries(ents)) entityLabels[id] = e.labels || [];
+    } else Object.assign(entityLabels, this._displayLabels || {});
+    return { labels: this._labels || [], entityLabels };
+  }
+
+  async _loadLabels() {
+    try {
+      const reg = await loadRegistry(this._h);
+      this._labels = reg.labels;
+      this._displayLabels = reg.entityLabels;
+    } catch {
+      this._labels ??= [];
+    }
+    this._render(true);
+  }
+
+  _modeOf(entityId, reg = this._registry()) {
+    const own = reg.entityLabels[entityId] || [];
+    return MODES.find((m) => {
+      const l = labelNamed(reg, m);
+      return l && own.includes(l.label_id);
+    }) || null;
+  }
+
+  _toast(text) {
+    const el = this._root().querySelector('.toast');
+    if (!el) return;
+    el.textContent = text;
+    el.hidden = false;
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => (el.hidden = true), 6000);
+  }
+
+  /** Runs a write; HA's error text goes to the toast. Returns the result, or undefined when it failed. */
+  async _run(fn) {
+    try {
+      return await fn();
+    } catch (err) {
+      this._toast(errorText(err));
+      return undefined;
+    }
+  }
+
+  _dirAttr() {
+    return this._lang === 'he' ? 'rtl' : 'ltr';
   }
 }
 
-export { BeitScheduleCard };
+// ---------------------------------------------------------------------------- beit-schedule-card
 
-if (typeof customElements !== 'undefined' && !customElements.get('beit-schedule-card')) {
-  customElements.define('beit-schedule-card', BeitScheduleCard);
+class BeitScheduleCard extends BeitCardBase {
+  static getStubConfig() {
+    return { show_add: true };
+  }
+
+  setConfig(config) {
+    if (config?.entities && !Array.isArray(config.entities)) throw new Error('entities must be a list');
+    if (config?.hide_entities && !Array.isArray(config.hide_entities)) throw new Error('hide_entities must be a list');
+    this._config = { show_add: true, ...config };
+    this._sig = null;
+    this._render();
+  }
+
+  set hass(hass) {
+    const first = !this._hass;
+    this._hass = hass;
+    if (first) {
+      this._loadLabels();
+      this._loadWeeks();
+    } else if (this._weeksSig !== this._scheduleSig()) this._loadWeeks();
+    this._render();
+  }
+
+  get hass() {
+    return this._hass;
+  }
+
+  getCardSize() {
+    return 2 + this._visible().length * 2;
+  }
+
+  getGridOptions() {
+    return { columns: 12, min_columns: 6 };
+  }
+
+  connectedCallback() {
+    // "today"/"tomorrow" go stale at midnight; the signature carries the date, so a tick is enough.
+    this._clock = setInterval(() => this._render(), 60000);
+  }
+
+  disconnectedCallback() {
+    clearInterval(this._clock);
+  }
+
+  // Which schedule entities changed, cheaply: their last_updated.
+  _scheduleSig() {
+    return Object.values(this._hass?.states || {})
+      .filter((e) => e.entity_id.startsWith('schedule.'))
+      .map((e) => `${e.entity_id}@${e.last_updated}`)
+      .join('|');
+  }
+
+  async _loadWeeks() {
+    this._weeksSig = this._scheduleSig();
+    if (!this._isAdmin) return; // schedule/list is an admin command
+    try {
+      this._weeks = await listSchedules(this._h);
+    } catch (err) {
+      this._weeks ??= {};
+      this._weeksError = errorText(err);
+    }
+    this._render(true);
+  }
+
+  _visible() {
+    const c = this._config || {};
+    const reg = this._registry();
+    const only = c.entities;
+    const hide = c.hide_entities || [];
+    return Object.values(this._hass?.states || {})
+      .filter((e) => e.entity_id.startsWith('schedule.'))
+      .filter((e) => (!only || only.includes(e.entity_id)) && !hide.includes(e.entity_id))
+      .filter((e) => !c.mode || this._modeOf(e.entity_id, reg) === c.mode)
+      .sort((a, b) => entityName(a).localeCompare(entityName(b), this._lang));
+  }
+
+  _render(force = false) {
+    if (!this._config || !this._hass) return;
+    const reg = this._registry();
+    const visible = this._visible();
+    const sig = JSON.stringify([
+      this._lang, this._isAdmin, this._config, new Date().toDateString(), new Date().getHours(),
+      visible.map((e) => [e.entity_id, e.last_updated, reg.entityLabels[e.entity_id]]), !!this._weeks, this._labels?.length,
+    ]);
+    if (!force && sig === this._sig) return;
+    this._sig = sig;
+    const t = this._t;
+    const root = this._root();
+    if (!root.querySelector('ha-card')) {
+      root.innerHTML = `<style>${BASE_STYLE}${SCHEDULE_STYLE}</style><ha-card><div class="body"></div></ha-card><div class="toast" hidden role="status"></div>`;
+      root.addEventListener('click', (e) => this._onClick(e));
+      root.addEventListener('keydown', (e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('.row[data-id]')) {
+          e.preventDefault();
+          this._onClick(e);
+        }
+      });
+    }
+    const canEdit = this._isAdmin;
+    const now = new Date();
+    const rows = visible.map((e) => this._rowHtml(e, reg, now, canEdit)).join('');
+    root.querySelector('.body').setAttribute('dir', this._dirAttr());
+    root.querySelector('.body').innerHTML = `
+      <div class="header">
+        <h2>${esc(this._config.title ?? t.schedules)}</h2>
+        ${canEdit && this._config.show_add !== false ? `<button class="btn primary" data-act="new">${icon('plus')}<span>${esc(t.newSchedule)}</span></button>` : ''}
+      </div>
+      ${canEdit ? '' : `<div class="hint">${esc(t.readOnly)}</div>`}
+      <div class="list" role="list">${rows || `<div class="hint">${esc(this._weeks || !canEdit ? t.noSchedules : t.loading)}</div>`}</div>`;
+  }
+
+  _rowHtml(e, reg, now, canEdit) {
+    const t = this._t;
+    const id = e.entity_id.slice('schedule.'.length);
+    const week = this._weeks?.[id];
+    const yaml = e.attributes?.editable === false || (this._weeks && !week);
+    const mode = this._modeOf(e.entity_id, reg);
+    const on = e.state === 'on';
+    const next = e.attributes?.next_event ? new Date(e.attributes.next_event) : null;
+    const editable = canEdit && !yaml && !!week;
+    const when = next && !isNaN(next) ? `${on ? t.ends : t.starts} ${formatWhen(next, now, this._lang)}` : '';
+    return `
+      <div class="row ${editable ? 'editable' : ''}" role="listitem" ${editable ? `data-id="${esc(e.entity_id)}" tabindex="0"` : ''}
+        aria-label="${esc(entityName(e))}">
+        <div class="line">
+          <span class="dot ${on ? 'on' : ''}" title="${esc(on ? t.onNow : t.offNow)}"></span>
+          <span class="name">${esc(entityName(e))}</span>
+          ${mode ? `<span class="chip ${mode === 'שבת' ? 'shabbat' : 'chag'}">${MODE_GLYPH[mode]} ${esc(t.modeName[mode])}</span>` : ''}
+          ${yaml ? `<span class="lock" title="${esc(t.yaml)}" aria-label="${esc(t.yaml)}">${icon('lock')}</span>` : ''}
+          <span class="spacer"></span>
+          <span class="state ${on ? 'on' : ''}">${esc(on ? t.onNow : t.offNow)}</span>
+        </div>
+        ${when ? `<div class="when muted small">${esc(when)}</div>` : ''}
+        ${week ? weekBarsHtml(week, this._lang) : yaml ? `<div class="muted small">${esc(t.yaml)}</div>` : ''}
+      </div>`;
+  }
+
+  _onClick(e) {
+    const act = e.target.closest?.('[data-act]')?.dataset.act;
+    if (act === 'new') return this._openEditor(null);
+    const row = e.target.closest?.('.row[data-id]');
+    if (row) this._openEditor(row.dataset.id);
+  }
+
+  _openEditor(_entityId) {
+    // The editor dialog comes next.
+  }
+}
+
+/** Seven thin bars, one per day, Sunday first; the time axis always runs left to right. */
+function weekBarsHtml(week, lang) {
+  const names = DAY_NAMES[lang];
+  return `<div class="bars" dir="ltr">${DAYS.map((d, i) => `
+    <div class="bar-row" title="${esc(names[i])}: ${esc(week.days[d].map(blockLabel).join(', ') || '—')}">
+      <span class="bar-day">${esc(DAY_SHORT[lang][i])}</span>
+      <span class="bar">${week.days[d].map((b) => `<i style="left:${(b.start / 14.4).toFixed(2)}%;width:${((b.end - b.start) / 14.4).toFixed(2)}%"></i>`).join('')}</span>
+    </div>`).join('')}</div>`;
+}
+
+const SCHEDULE_STYLE = `
+  .list { padding: 0 8px 8px; }
+  .row { padding: 10px 8px; border-top: 1px solid var(--divider-color); border-radius: 8px; }
+  .row:first-child { border-top: 0; }
+  .row.editable { cursor: pointer; }
+  .row.editable:hover { background: color-mix(in srgb, var(--primary-color) 6%, transparent); }
+  .line { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .name { font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .spacer { flex: 1; }
+  .state { font-size: 12px; color: var(--secondary-text-color); white-space: nowrap; }
+  .state.on { color: var(--success-color, #43a047); font-weight: 500; }
+  .lock { display: inline-flex; color: var(--secondary-text-color); }
+  .lock .ic { width: 16px; height: 16px; }
+  .when { margin: 2px 16px 0; }
+  .bars { margin: 8px 16px 0; display: flex; flex-direction: column; gap: 3px; }
+  .bar-row { display: flex; align-items: center; gap: 6px; }
+  .bar-day { width: 16px; font-size: 10px; color: var(--secondary-text-color); text-align: center; flex: none; }
+  .bar { position: relative; flex: 1; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--divider-color) 70%, transparent); overflow: hidden; }
+  .bar i { position: absolute; top: 0; bottom: 0; background: var(--primary-color); border-radius: 3px; }
+`;
+
+export { BeitScheduleCard, BeitCardBase };
+
+if (typeof customElements !== 'undefined') {
+  if (!customElements.get('beit-schedule-card')) customElements.define('beit-schedule-card', BeitScheduleCard);
+  window.customCards = window.customCards || [];
+  if (!window.customCards.some((c) => c.type === 'beit-schedule-card')) {
+    window.customCards.push({
+      type: 'beit-schedule-card',
+      name: 'Beit — תזמונים / Schedules',
+      description: 'לוח זמנים שבועי לכל מכשיר, עם מצבי שבת וחג. Weekly device schedules with Shabbat and chag modes.',
+      preview: false,
+    });
+  }
 }

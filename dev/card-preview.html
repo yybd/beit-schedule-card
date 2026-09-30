@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="he">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beit Schedule Card preview</title>
+<style>
+  /* Home Assistant's theme variables, light and dark. */
+  :root {
+    --primary-color: #03a9f4; --text-primary-color: #fff; --primary-text-color: #212121; --secondary-text-color: #727272;
+    --disabled-text-color: #bdbdbd; --card-background-color: #fff; --primary-background-color: #fafafa;
+    --secondary-background-color: #e5e5e5; --divider-color: rgba(0,0,0,.12); --error-color: #db4437; --success-color: #43a047;
+    --warning-color: #ffa600; --ha-card-border-radius: 12px; --ha-card-box-shadow: none; --ha-card-border-color: #e0e0e0;
+    color-scheme: light;
+  }
+  :root.dark {
+    --primary-text-color: #e1e1e1; --secondary-text-color: #9b9b9b; --disabled-text-color: #6f6f6f; --card-background-color: #1c1c1c;
+    --primary-background-color: #111; --secondary-background-color: #282828; --divider-color: rgba(225,225,225,.12);
+    --ha-card-border-color: rgba(225,225,225,.12); color-scheme: dark;
+  }
+  body { background: var(--primary-background-color); margin: 0; padding: 16px; font-family: Roboto, system-ui, sans-serif;
+    color: var(--primary-text-color); }
+  ha-card { display: block; background: var(--card-background-color); border-radius: var(--ha-card-border-radius);
+    border: 1px solid var(--ha-card-border-color); box-shadow: var(--ha-card-box-shadow); color: var(--primary-text-color); }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; font-size: 13px; }
+  .bar a, .bar span { color: var(--primary-color); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start; }
+  #log { font: 11px/1.4 ui-monospace, monospace; color: var(--secondary-text-color); white-space: pre-wrap; margin-top: 16px; max-height: 240px; overflow: auto; }
+</style>
+</head>
+<body>
+<!-- Dev harness. Offline: a fake hass over the synthetic fixtures (tests/fixtures). Writes change only the page's memory. -->
+<div class="bar" id="bar"></div>
+<div class="grid">
+  <beit-schedule-card id="schedules"></beit-schedule-card>
+  <beit-shabbat-card id="shabbat"></beit-shabbat-card>
+</div>
+<div id="log"></div>
+<script type="module">
+  import '../dist/beit-schedule-card.js';
+  import { FakeHass } from '../tests/fake-hass.mjs';
+
+  const q = new URLSearchParams(location.search);
+  const lang = q.get('lang') || 'he';
+  if (q.get('theme') === 'dark') document.documentElement.classList.add('dark');
+  document.documentElement.lang = lang;
+
+  const link = (key, value, text) => {
+    const p = new URLSearchParams(q);
+    value === null ? p.delete(key) : p.set(key, value);
+    return `<a href="?${p}">${text}</a>`;
+  };
+  document.getElementById('bar').innerHTML = [
+    '<b>offline</b>',
+    lang === 'he' ? link('lang', 'en', 'English') : link('lang', null, 'עברית'),
+    q.get('theme') === 'dark' ? link('theme', null, 'light') : link('theme', 'dark', 'dark'),
+    q.get('admin') === '0' ? link('admin', null, 'admin') : link('admin', '0', 'non-admin'),
+  ].join(' · ');
+
+  const log = (m) => { const el = document.getElementById('log'); el.textContent = m + '\n' + el.textContent; };
+  const names = ['states', 'schedule_list', 'automation_configs', 'label_registry', 'entity_registry_display', 'area_registry', 'device_registry'];
+  const fixtures = Object.fromEntries(await Promise.all(names.map(async (n) => [n, await (await fetch(`../tests/fixtures/${n}.json`)).json()])));
+  const fake = new FakeHass(fixtures, { isAdmin: q.get('admin') !== '0', language: lang, stateDelay: 300 });
+  window.fake = fake;
+
+  const cards = [document.getElementById('schedules'), document.getElementById('shabbat')];
+  const configs = [JSON.parse(q.get('schedules') || '{}'), JSON.parse(q.get('shabbat') || '{}')];
+  // HA calls setConfig more than once, and sets hass before and after: do the same here.
+  cards.forEach((c, i) => { if (c.setConfig) { c.setConfig(configs[i]); c.hass = fake.snapshot(); c.setConfig(configs[i]); } });
+  const push = () => cards.forEach((c) => { if (c.setConfig) c.hass = fake.snapshot(); });
+  fake.onChange(push);
+  let seen = 0;
+  setInterval(() => { for (; seen < fake.calls.length; seen++) log(JSON.stringify(fake.calls[seen])); }, 300);
+  setInterval(() => { fake.tick(); push(); }, 60000);
+</script>
+</body>
+</html>
