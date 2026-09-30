@@ -207,7 +207,7 @@ The full data model is documented in [docs/contract.md](docs/contract.md).
 ## Permissions
 
 Home Assistant allows only administrators to create or change helpers, automations and labels. For non-admin users,
-the card shows schedules and modes read-only. Switching a mode on or off uses ordinary service calls and works for
+the card shows schedules (with their week) and modes read-only. Switching a mode on or off uses ordinary service calls and works for
 every user.
 
 ## FAQ

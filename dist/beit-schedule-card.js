@@ -485,6 +485,17 @@ export async function listSchedules(hass) {
   return Object.fromEntries(list.map((s) => [s.id, WeekSchedule.fromHA(s)]));
 }
 
+/**
+ * The weeks of any schedule entities, UI or YAML, through the schedule.get_schedule action. Unlike schedule/list it
+ * is open to every user. `{entity_id: WeekSchedule}`.
+ */
+export async function readSchedules(hass, entityIds) {
+  if (!entityIds.length) return {};
+  const res = await hass.callService('schedule', 'get_schedule', {}, { entity_id: entityIds }, false, true);
+  const weeks = res?.response ?? {};
+  return Object.fromEntries(Object.entries(weeks).map(([id, days]) => [id, WeekSchedule.fromHA({ ...days, name: '' })]));
+}
+
 export const updateSchedule = (hass, id, week) => hass.callWS({ type: 'schedule/update', schedule_id: id, ...week.toHA() });
 
 export async function automationsFor(hass, entityId) {
@@ -1308,12 +1319,22 @@ class BeitScheduleCard extends BeitCardBase {
 
   async _loadWeeks() {
     this._weeksSig = this._scheduleSig();
-    if (!this._isAdmin) return; // schedule/list is an admin command
+    if (this._isAdmin) {
+      // schedule/list is an admin command, and the only source of what can be edited.
+      try {
+        this._weeks = await listSchedules(this._h);
+      } catch (err) {
+        this._weeks ??= {};
+        this._weeksError = errorText(err);
+      }
+    }
+    // The rest (YAML schedules, or every schedule for a non-admin) is read-only: get_schedule is open to everyone.
+    const rest = Object.keys(this._hass?.states || {})
+      .filter((id) => id.startsWith('schedule.') && !this._weeks?.[id.slice('schedule.'.length)]);
     try {
-      this._weeks = await listSchedules(this._h);
-    } catch (err) {
-      this._weeks ??= {};
-      this._weeksError = errorText(err);
+      this._readWeeks = await readSchedules(this._h, rest);
+    } catch {
+      this._readWeeks ??= {};
     }
     this._render(true);
   }
@@ -1336,7 +1357,7 @@ class BeitScheduleCard extends BeitCardBase {
     const visible = this._visible();
     const sig = JSON.stringify([
       this._lang, this._isAdmin, this._config, new Date().toDateString(), new Date().getHours(),
-      visible.map((e) => [e.entity_id, e.last_updated, reg.entityLabels[e.entity_id]]), !!this._weeks, this._labels?.length,
+      visible.map((e) => [e.entity_id, e.last_updated, reg.entityLabels[e.entity_id]]), !!this._weeks, Object.keys(this._readWeeks || {}).length, this._labels?.length,
     ]);
     if (!force && sig === this._sig) return;
     this._sig = sig;
@@ -1367,12 +1388,13 @@ class BeitScheduleCard extends BeitCardBase {
   _rowHtml(e, reg, now, canEdit) {
     const t = this._t;
     const id = e.entity_id.slice('schedule.'.length);
-    const week = this._weeks?.[id];
+    const editableWeek = this._weeks?.[id];
+    const week = editableWeek || this._readWeeks?.[e.entity_id];
     const yaml = e.attributes?.editable === false || (this._weeks && !week);
     const mode = this._config.show_modes !== false ? this._modeOf(e.entity_id, reg) : null;
     const on = e.state === 'on';
     const next = e.attributes?.next_event ? new Date(e.attributes.next_event) : null;
-    const editable = canEdit && !yaml && !!week;
+    const editable = canEdit && !yaml && !!editableWeek;
     const when = next && !isNaN(next) ? `${on ? t.ends : t.starts} ${formatWhen(next, now, this._lang)}` : '';
     return `
       <div class="row ${editable ? 'editable' : ''}" role="listitem" ${editable ? `data-id="${esc(e.entity_id)}" tabindex="0"` : ''}
@@ -1386,7 +1408,8 @@ class BeitScheduleCard extends BeitCardBase {
           <span class="state ${on ? 'on' : ''}">${esc(on ? t.onNow : t.offNow)}</span>
         </div>
         ${when ? `<div class="when muted small">${esc(when)}</div>` : ''}
-        ${week ? weekBarsHtml(week, this._lang) : yaml ? `<div class="muted small">${esc(t.yaml)}</div>` : ''}
+        ${yaml ? `<div class="muted small">${esc(t.yaml)}</div>` : ''}
+        ${week ? weekBarsHtml(week, this._lang) : ''}
       </div>`;
   }
 

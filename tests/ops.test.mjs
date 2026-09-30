@@ -9,7 +9,7 @@ import {
   enableAutoShabbat, disableAutoShabbat, isOurs, weekStatus, errorText, AUTO_SHABBAT_ALIAS, BEIT_MARKER,
 } from '../dist/beit-schedule-card.js';
 
-const NAMES = ['states', 'schedule_list', 'automation_configs', 'label_registry', 'entity_registry_display', 'area_registry', 'device_registry'];
+const NAMES = ['states', 'schedule_list', 'automation_configs', 'label_registry', 'entity_registry_display', 'area_registry', 'device_registry', 'yaml_schedules'];
 export const fixtures = Object.fromEntries(NAMES.map((n) => [n, JSON.parse(readFileSync(new URL(`fixtures/${n}.json`, import.meta.url)))]));
 // A Sunday morning, local time.
 const SUNDAY_9AM = () => new Date(2026, 0, 4, 9, 0, 0);
@@ -419,4 +419,16 @@ test('taking an automation out of a mode keeps a schedule another member still f
   await setAutomationInMode(hass, 'חג', 'automation.beit_water_heater_weekdays', true);
   reg = await loadRegistry(hass);
   assert.deepEqual(reg.entityLabels['schedule.water_heater_weekdays'], ['energy', 'khg']);
+});
+
+import { readSchedules } from '../dist/beit-schedule-card.js';
+
+test('readSchedules reads UI and YAML weeks through get_schedule, which non-admins may call', async () => {
+  const hass = house({ isAdmin: false });
+  const weeks = await readSchedules(hass, ['schedule.pool_pump', 'schedule.balcony_light']);
+  assert.deepEqual(weeks['schedule.pool_pump'].days.monday, [{ start: 360, end: 480 }]);
+  assert.equal(weeks['schedule.balcony_light'].days.sunday[0].end, 1440);
+  const call = hass.calls.at(-1);
+  assert.deepEqual([call.domain, call.service, call.target], ['schedule', 'get_schedule', { entity_id: ['schedule.pool_pump', 'schedule.balcony_light'] }]);
+  assert.deepEqual(await readSchedules(hass, []), {});
 });

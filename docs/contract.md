@@ -16,6 +16,8 @@ marker), `test/schedule_test.dart` (cases to port 1:1), `lib/store/home_store.da
   - Read `"23:59:59"` as 24:00; the app writes it back as `"24:00:00"`.
   - Minute precision.
 - Blocks within a day must not overlap, and `to > from`. HA rejects the write otherwise.
+- Reading a week without editing it: the `schedule.get_schedule` action with `return_response`. Unlike
+  `schedule/list` it is open to non-admins and covers YAML schedules too.
 - `schedule/create` generates the id as a slug of the name. The entity is `schedule.<id>`.
 - `schedule/update` takes the full body: `schedule_id`, `name` and all seven days.
 

@@ -38,6 +38,7 @@ export class FakeHass {
     this._fail = {};
     this._listeners = new Set();
     this._schedules = f.schedule_list || [];
+    this._yamlSchedules = f.yaml_schedules || {}; // what get_schedule knows of YAML schedules
     this._configs = {}; // automation config id -> {entityId, config}
     for (const [entityId, config] of Object.entries(f.automation_configs || {})) this._configs[config.id] = { entityId, config };
     this._labels = f.label_registry || [];
@@ -142,10 +143,19 @@ export class FakeHass {
 
   // ---- services ------------------------------------------------------------------------------------------------------
 
-  async callService(domain, service, data = {}, target = {}) {
+  async callService(domain, service, data = {}, target = {}, _notifyOnError = true, returnResponse = false) {
     this.calls.push({ kind: 'service', domain, service, data: clone(data || {}), target: clone(target || {}) });
     this._maybeFail(`${domain}.${service}`);
     const ids = this._resolveTarget({ ...(data || {}), ...(target || {}) });
+    if (domain === 'schedule' && service === 'get_schedule') {
+      if (!returnResponse) throw new HAError('service_validation_error', 'Service call requires responses but caller did not ask for responses');
+      const response = {};
+      for (const id of ids) {
+        const item = this._schedules.find((x) => `schedule.${x.id}` === id) || this._yamlSchedules[id];
+        if (item) response[id] = Object.fromEntries(DAYS.map((d) => [d, clone(item[d] || [])]));
+      }
+      return { context: { id: 'fake' }, response };
+    }
     if (domain === 'automation' && (service === 'turn_on' || service === 'turn_off')) {
       for (const id of ids.filter((x) => x.startsWith('automation.'))) {
         const st = this._states[id];

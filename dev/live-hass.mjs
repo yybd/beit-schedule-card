@@ -77,10 +77,11 @@ export async function connectLive({ writes = false, language = 'he', onChange = 
       if (!res.ok) throw { error: data?.message || res.statusText, status_code: res.status, body: data };
       return data;
     },
-    async callService(domain, service, data = {}, target = {}) {
-      guard(`${domain}.${service}`);
+    async callService(domain, service, data = {}, target = {}, _notifyOnError = true, returnResponse = false) {
+      // schedule.get_schedule only reads; everything else could change the house.
+      if (!(domain === 'schedule' && service === 'get_schedule')) guard(`${domain}.${service}`);
       log(`service ${domain}.${service} ${JSON.stringify(target)}`);
-      return send({ type: 'call_service', domain, service, service_data: data, target });
+      return send({ type: 'call_service', domain, service, service_data: data, target, ...(returnResponse ? { return_response: true } : {}) });
     },
   };
   const snapshot = () => ({ ...hass, states, entities });
