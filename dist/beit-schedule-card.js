@@ -455,6 +455,24 @@ export async function deleteSchedule(hass, scheduleEntityId) {
 }
 
 /**
+ * Rewrites the automation Beit wrote for a schedule, under the same id, to drive `target` (and carry the schedule's
+ * current name). Only for a config parseScheduleAutomation understands. Returns false when nothing would change.
+ */
+export async function rewriteScheduleAutomation(hass, config, { scheduleName, target }) {
+  const parsed = parseScheduleAutomation(config);
+  if (!parsed) throw new Error('This automation was edited by hand; change it in Home Assistant');
+  const next = buildScheduleAutomation({
+    id: config.id,
+    scheduleEntityId: parsed.scheduleEntityId,
+    scheduleName: (scheduleName ?? parsed.scheduleName).trim(),
+    target: target ?? parsed.target,
+  });
+  if (sameConfig(next, config)) return false;
+  await hass.callApi('POST', `config/automation/config/${config.id}`, next);
+  return true;
+}
+
+/**
  * After a schedule is renamed: the automations Beit wrote for it follow, but only those still named
  * `Beit · <old name>`; an alias the user changed stays. Returns the entity ids that were renamed.
  */
@@ -663,6 +681,8 @@ export const STRINGS = {
     noArea: 'ללא חדר',
     noDevices: 'לא נמצאו מכשירים',
     whileActive: 'מצב בזמן פעילות',
+    whatItDoes: 'מה הוא עושה',
+    handEdited: 'האוטומציה של התזמון נערכה ידנית — את המכשיר ואת הפעולה משנים בה, ב-Home Assistant.',
     setTemp: 'לקבוע טמפרטורה',
     brightness: 'בהירות',
     turnOffAtEnd: 'לכבות בסוף הטווח',
@@ -772,6 +792,8 @@ export const STRINGS = {
     noArea: 'No room',
     noDevices: 'No devices found',
     whileActive: 'Mode while active',
+    whatItDoes: 'What it does',
+    handEdited: "This schedule's automation was edited by hand; change its device and action in Home Assistant.",
     setTemp: 'Set a temperature',
     brightness: 'Brightness',
     turnOffAtEnd: 'Turn off at the end',
@@ -1263,6 +1285,8 @@ class ScheduleEditor {
     this.brightness = null;
     this.turnOffAtEnd = true;
     this.automations = null; // existing schedule: the automations it drives
+    this.driven = null; // existing schedule: {automation, config, parsed} for the one automation Beit can rewrite
+    this.handEdited = false;
     this.rangeEdit = null; // {day, index}
     this.copyFrom = null; // {day, chosen: Set}
     this.query = '';
@@ -1300,10 +1324,48 @@ class ScheduleEditor {
       this.card._pickerData().then((d) => { this.picker = d; if (this.view === 'picker') this.render(); }, (err) => { this.error = errorText(err); this.render(); });
     } else {
       automationsFor(this.card._h, this.entityId).then(
-        (a) => { this.automations = a; this.renderLinked(); },
+        (a) => { this.automations = a; this.renderLinked(); this.loadDriven(a); },
         () => { this.automations = []; this.renderLinked(); },
       );
     }
+  }
+
+  /** The automation Beit wrote for this schedule, if it can be rewritten: then device and action become editable. */
+  async loadDriven(automations) {
+    const h = this.card._h;
+    const ours = [];
+    for (const a of automations) {
+      const config = await automationConfig(h, a).catch(() => null);
+      if (isOurs(config)) ours.push({ automation: a, config, parsed: parseScheduleAutomation(config) });
+    }
+    const editable = ours.filter((o) => o.parsed && o.parsed.scheduleEntityId === this.entityId);
+    if (editable.length === 1) {
+      this.driven = editable[0];
+      const tgt = this.driven.parsed.target;
+      this.device = this.card._hass.states[tgt.entityId] || { entity_id: tgt.entityId, state: 'unavailable', attributes: { friendly_name: tgt.name } };
+      this.hvacMode = tgt.hvacMode;
+      this.temperature = tgt.temperature;
+      this.brightness = tgt.brightnessPct;
+      this.turnOffAtEnd = tgt.turnOffAtEnd;
+    } else this.handEdited = ours.some((o) => !o.parsed);
+    if (this.view === 'main' && (this.driven || this.handEdited)) {
+      this.syncName();
+      this.render();
+    }
+  }
+
+  /** What the device section describes now. */
+  currentTarget() {
+    const d = this.device;
+    const keepName = this.driven && this.driven.parsed.target.entityId === d.entity_id;
+    return {
+      entityId: d.entity_id,
+      name: keepName ? this.driven.parsed.target.name : entityName(d),
+      hvacMode: domainOf(d.entity_id) === 'climate' ? this.hvacMode : null,
+      temperature: this.temperature,
+      brightnessPct: this.brightness,
+      turnOffAtEnd: this.turnOffAtEnd,
+    };
   }
 
   close() {
@@ -1372,7 +1434,8 @@ class ScheduleEditor {
         </div>
         ${this.mode ? `<div class="muted small">${esc(t.modeHint(t.modeName[this.mode]))}</div>` : ''}
       </div>`}
-      ${this.isNew ? this.targetHtml() : `<div class="section linked">${this.linkedHtml()}</div>`}
+      ${this.isNew ? this.targetHtml() : `<div class="section linked">${this.linkedHtml()}</div>
+        ${this.driven ? this.targetHtml(t.whatItDoes) : this.handEdited ? `<div class="muted small">${esc(t.handEdited)}</div>` : ''}`}
       <div class="section">
         <div class="label row-between"><span>${esc(t.hours)}</span>
           <button class="link" data-act="clear" data-focus="clear">${esc(t.clearAll)}</button></div>
@@ -1381,7 +1444,7 @@ class ScheduleEditor {
       </div>`;
   }
 
-  targetHtml() {
+  targetHtml(title = this.t.device) {
     const t = this.t;
     const d = this.device;
     let options = '';
@@ -1410,7 +1473,7 @@ class ScheduleEditor {
         ${switchHtml({ checked: this.turnOffAtEnd, label: o.domain === 'cover' ? t.closeAtEnd : t.turnOffAtEnd, attrs: 'data-field="turnOff" data-focus="turnOff"' })}</div>`;
     }
     return `<div class="section">
-      <div class="label">${esc(t.device)}</div>
+      <div class="label">${esc(title)}</div>
       <button class="device" data-act="pick" data-focus="pick">
         ${d ? `<span class="dname">${esc(entityName(d))}</span><span class="muted small" dir="ltr">${esc(d.entity_id)}</span><span class="spacer"></span><span class="link">${esc(t.changeDevice)}</span>`
           : `${icon('plus')}<span>${esc(t.chooseDevice)}</span>`}
@@ -1529,7 +1592,13 @@ class ScheduleEditor {
       case 'askDelete': this.view = 'confirmDelete'; this.error = ''; break;
       case 'doDelete': return this.remove();
       case 'mode': this.mode = el.dataset.mode || null; break;
-      case 'pick': this.view = 'picker'; this.query = ''; break;
+      case 'pick':
+        this.view = 'picker';
+        this.query = '';
+        if (!this.picker) {
+          this.card._pickerData().then((d) => { this.picker = d; if (this.view === 'picker') this.render(); }, (err) => { this.error = errorText(err); this.view = 'main'; this.render(); });
+        }
+        break;
       case 'choose': {
         const d = this.card._hass.states[el.dataset.id];
         if (!d) return;
@@ -1649,18 +1718,10 @@ class ScheduleEditor {
     const h = this.card._h;
     try {
       if (this.isNew) {
-        const d = this.device;
-        const climate = domainOf(d.entity_id) === 'climate';
-        await createScheduleWithAutomation(h, this.week, {
-          entityId: d.entity_id,
-          name: entityName(d),
-          hvacMode: climate ? this.hvacMode : null,
-          temperature: this.temperature,
-          brightnessPct: this.brightness,
-          turnOffAtEnd: this.turnOffAtEnd,
-        }, { labelName: this.mode });
+        await createScheduleWithAutomation(h, this.week, this.currentTarget(), { labelName: this.mode });
       } else {
         await updateSchedule(h, this.id, this.week);
+        if (this.driven) await rewriteScheduleAutomation(h, this.driven.config, { scheduleName: this.week.name, target: this.currentTarget() });
         await renameScheduleAutomations(h, this.automations || [], this.originalName, this.week.name);
         // Only when the user changed it: the automations may carry a mode the schedule itself does not.
         if (this.mode !== this.originalMode) {

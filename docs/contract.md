@@ -56,6 +56,9 @@ Written with `POST /api/config/automation/config/<id>`. From a card this is `has
   2. Wait for `schedule.<id>` to appear in `hass.states`.
   3. POST the automation.
   4. If the POST fails, `schedule/delete`, so the card never leaves a helper that drives nothing.
+- **Changing what a schedule does** (its device, HVAC mode, temperature, brightness, turning off at the end): the one
+  related automation that carries the marker **and** is still exactly in the shape above is POSTed again under the same
+  id, rebuilt with the new target. An automation edited by hand is never rewritten; the user changes it in HA.
 - **Renaming a schedule:** each related automation carrying the marker and still named `Beit · <old name>` is POSTed
   again with `alias: "Beit · <new name>"` and nothing else changed. An alias the user changed is left alone.
 - **Finding a schedule's automations:** `search/related {item_type: "entity", item_id: "schedule.<id>"}` → `.automation[]`.

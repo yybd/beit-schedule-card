@@ -38,7 +38,8 @@
   do while the schedule is active (HVAC mode, temperature, brightness), and the hours for each day of the week. The card
   creates the schedule helper and the automation that drives the device.
 - **Edit every schedule in the house.** A clear week view for each UI-managed schedule helper. You can add ranges, copy a
-  day to the other weekdays or to the whole week, and set ranges that run until midnight.
+  day to the other weekdays or to the whole week, and set ranges that run until midnight. For a schedule the card
+  created, you can also change the device and what it does; renaming a schedule renames its automation too.
 - **Shabbat and chag modes.** A single switch turns on or off every automation that belongs to a mode, and the card
   shows whether the mode is fully on, partly on or off.
 - **Automatic Shabbat mode.** Switches on before Friday's schedules begin and off after Shabbat ends. It turns off only

@@ -296,3 +296,21 @@ test('renaming a schedule renames only the Beit automations still named after it
   assert.deepEqual(await renameScheduleAutomations(house(), autos, 'שם אחר', 'חדש'), []);
   assert.deepEqual(await renameScheduleAutomations(house(), autos, 'x', 'x'), []);
 });
+
+import { rewriteScheduleAutomation } from '../dist/beit-schedule-card.js';
+
+test('rewriteScheduleAutomation changes device and action under the same id, and only when something changed', async () => {
+  const hass = house();
+  const cfg = fixtures.automation_configs['automation.beit_bedroom_ac_shabbat'];
+  assert.equal(await rewriteScheduleAutomation(hass, cfg, {}), false);
+  assert.equal(hass.calls.filter((c) => c.method === 'POST').length, 0);
+  const target = { entityId: 'climate.bedroom_ac', name: 'מזגן חדר שינה', hvacMode: 'heat', temperature: 22, brightnessPct: null, turnOffAtEnd: true };
+  assert.equal(await rewriteScheduleAutomation(hass, cfg, { scheduleName: 'מזגן חדר שינה שבת', target }), true);
+  const post = hass.calls.find((c) => c.method === 'POST');
+  assert.equal(post.path, 'config/automation/config/1767000000002');
+  assert.deepEqual(post.body.actions[0].choose[0].sequence[0].data, { temperature: 22, hvac_mode: 'heat' });
+  await new Promise((r) => setTimeout(r, 20));
+  // Same entity, same on/off state.
+  assert.equal(hass.states['automation.beit_bedroom_ac_shabbat'].state, 'off');
+  await assert.rejects(rewriteScheduleAutomation(hass, fixtures.automation_configs['automation.living_room_fan_shabbat'], { target }), /by hand/);
+});
