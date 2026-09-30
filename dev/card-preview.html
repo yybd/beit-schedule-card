@@ -50,8 +50,11 @@
     value === null ? p.delete(key) : p.set(key, value);
     return `<a href="?${p}">${text}</a>`;
   };
+  const live = q.get('live') === '1';
+  const writes = live && q.get('writes') === '1';
   document.getElementById('bar').innerHTML = [
-    '<b>offline</b>',
+    live ? `<b>live${writes ? ' — WRITES ENABLED' : ' (read-only)'}</b>` : '<b>offline</b>',
+    live ? link('live', null, 'offline') : link('live', '1', 'live'),
     lang === 'he' ? link('lang', 'en', 'English') : link('lang', null, 'עברית'),
     q.get('theme') === 'dark' ? link('theme', null, 'light') : link('theme', 'dark', 'dark'),
     q.get('admin') === '0' ? link('admin', null, 'admin') : link('admin', '0', 'non-admin'),
@@ -59,21 +62,32 @@
   ].join(' · ');
 
   const log = (m) => { const el = document.getElementById('log'); el.textContent = m + '\n' + el.textContent; };
-  const names = ['states', 'schedule_list', 'automation_configs', 'label_registry', 'entity_registry_display', 'area_registry', 'device_registry'];
-  const fixtures = Object.fromEntries(await Promise.all(names.map(async (n) => [n, await (await fetch(`../tests/fixtures/${n}.json`)).json()])));
-  const fake = new FakeHass(fixtures, { isAdmin: q.get('admin') !== '0', language: lang, stateDelay: 300 });
-  window.fake = fake;
-
   const cards = [document.getElementById('schedules'), document.getElementById('shabbat')];
   const configs = [JSON.parse(q.get('schedules') || '{}'), JSON.parse(q.get('shabbat') || '{}')];
-  // HA calls setConfig more than once, and sets hass before and after: do the same here.
-  cards.forEach((c, i) => { if (c.setConfig) { c.setConfig(configs[i]); c.hass = fake.snapshot(); c.setConfig(configs[i]); } });
-  // The visual editors, wired as HA wires them: config-changed → card.setConfig, and the config echoed back.
   const editors = [];
+  let source;
+  if (live) {
+    const { connectLive } = await import('./live-hass.mjs');
+    source = await connectLive({ writes, language: lang, log, onChange: (h) => push(h) });
+  } else {
+    const names = ['states', 'schedule_list', 'automation_configs', 'label_registry', 'entity_registry_display', 'area_registry', 'device_registry'];
+    const fixtures = Object.fromEntries(await Promise.all(names.map(async (n) => [n, await (await fetch(`../tests/fixtures/${n}.json`)).json()])));
+    const fake = new FakeHass(fixtures, { isAdmin: q.get('admin') !== '0', language: lang, stateDelay: 300 });
+    window.fake = fake;
+    source = fake;
+    let seen = 0;
+    setInterval(() => { for (; seen < fake.calls.length; seen++) log(JSON.stringify(fake.calls[seen])); }, 300);
+    setInterval(() => { fake.tick(); push(); }, 60000);
+    fake.onChange(() => push());
+  }
+
+  // HA calls setConfig more than once, and sets hass before and after: do the same here.
+  cards.forEach((c, i) => { if (c.setConfig) { c.setConfig(configs[i]); c.hass = source.snapshot(); c.setConfig(configs[i]); } });
+  // The visual editors, wired as HA wires them: config-changed → card.setConfig, and the config echoed back.
   if (q.get('editors')) {
     cards.forEach((card, i) => {
       const ed = card.constructor.getConfigElement();
-      ed.hass = fake.snapshot();
+      ed.hass = source.snapshot();
       ed.setConfig(configs[i]);
       ed.addEventListener('config-changed', (e) => { log(`config ${JSON.stringify(e.detail.config)}`); card.setConfig(e.detail.config); ed.setConfig(e.detail.config); });
       const box = document.createElement('ha-card');
@@ -83,11 +97,10 @@
       editors.push(ed);
     });
   }
-  const push = () => [...cards, ...editors].forEach((c) => { if (c.setConfig) c.hass = fake.snapshot(); });
-  fake.onChange(push);
-  let seen = 0;
-  setInterval(() => { for (; seen < fake.calls.length; seen++) log(JSON.stringify(fake.calls[seen])); }, 300);
-  setInterval(() => { fake.tick(); push(); }, 60000);
+  function push(h) {
+    if (!source) return;
+    [...cards, ...editors].forEach((c) => { if (c.setConfig) c.hass = h || source.snapshot(); });
+  }
 </script>
 </body>
 </html>
