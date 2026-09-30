@@ -1215,7 +1215,8 @@ class BeitCardBase extends Base {
     const root = this._root();
     // A modal dialog sits in the top layer: a toast outside it would be hidden behind its backdrop.
     const host = root.querySelector('dialog[open]') || root;
-    let el = host.querySelector(':scope > .toast');
+    // A direct child: `:scope >` matches nothing when asked of a shadow root.
+    let el = [...host.children].find((c) => c.classList.contains('toast'));
     if (!el) {
       el = document.createElement('div');
       el.className = 'toast';
