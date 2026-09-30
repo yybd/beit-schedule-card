@@ -11,7 +11,7 @@
  * Custom elements are registered only where `customElements` exists.
  */
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.0.1';
 
 // ---------------------------------------------------------------------------- week model
 
@@ -686,6 +686,8 @@ export const STRINGS = {
     edNone: 'כלום',
     edModes: 'מצבים',
     edShowCalendar: 'הצגת זמני השבת והחג',
+    edHeight: 'גובה',
+    edHeightHint: 'אוטומטי — או למשל 500px או 60vh; התוכן נגלל בתוך הכרטיס',
   },
   en: {
     errName: 'The schedule needs a name',
@@ -793,8 +795,17 @@ export const STRINGS = {
     edNone: 'None',
     edModes: 'Modes',
     edShowCalendar: 'Show Shabbat and chag times',
+    edHeight: 'Height',
+    edHeightHint: 'Automatic, or e.g. 500px or 60vh; the content scrolls inside the card',
   },
 };
+
+/** A config height ("500px", "60vh", or a bare number of pixels) as CSS; null when the card should size itself. */
+export function cssHeight(value) {
+  if (value === undefined || value === null || String(value).trim() === '') return null;
+  const v = String(value).trim();
+  return /^\d+(\.\d+)?$/.test(v) ? `${v}px` : v;
+}
 
 export const langOf = (hass) => (String(hass?.locale?.language || hass?.language || 'he').startsWith('he') ? 'he' : 'en');
 
@@ -846,6 +857,11 @@ const BASE_STYLE = `
   .icon-btn:hover, .btn:hover { background: color-mix(in srgb, var(--primary-color) 10%, transparent); }
   .btn.primary:hover { filter: brightness(1.08); background: var(--primary-color); }
   :focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+  /* With a height set, the header stays put and the rest scrolls. */
+  ha-card.fixed { display: flex; flex-direction: column; overflow: hidden; }
+  ha-card.fixed .body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  ha-card.fixed .header { flex: none; }
+  ha-card.fixed .scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   .header { display: flex; align-items: center; gap: 8px; padding: 16px 16px 8px; }
   .header h2 { margin: 0; flex: 1; font-size: 20px; font-weight: 500; color: var(--ha-card-header-color, var(--primary-text-color)); }
   .muted { color: var(--secondary-text-color); }
@@ -976,6 +992,20 @@ class BeitCardBase extends Base {
   _dirAttr() {
     return this._lang === 'he' ? 'rtl' : 'ltr';
   }
+
+  /** Writes the card body: a header and a scroll area, which keeps its scroll position across redraws. */
+  _paint(header, content) {
+    const root = this._root();
+    const card = root.querySelector('ha-card');
+    const height = cssHeight(this._config.height);
+    card.classList.toggle('fixed', !!height);
+    card.style.height = height || '';
+    const body = root.querySelector('.body');
+    const top = body.querySelector('.scroll')?.scrollTop ?? 0;
+    body.setAttribute('dir', this._dirAttr());
+    body.innerHTML = `${header}<div class="scroll">${content}</div>`;
+    body.querySelector('.scroll').scrollTop = top;
+  }
 }
 
 // ---------------------------------------------------------------------------- beit-schedule-card
@@ -1086,14 +1116,13 @@ class BeitScheduleCard extends BeitCardBase {
     const canEdit = this._isAdmin;
     const now = new Date();
     const rows = visible.map((e) => this._rowHtml(e, reg, now, canEdit)).join('');
-    root.querySelector('.body').setAttribute('dir', this._dirAttr());
-    root.querySelector('.body').innerHTML = `
+    this._paint(`
       <div class="header">
         <h2>${esc(this._config.title ?? t.schedules)}</h2>
         ${canEdit && this._config.show_add !== false ? `<button class="btn primary" data-act="new">${icon('plus')}<span>${esc(t.newSchedule)}</span></button>` : ''}
-      </div>
+      </div>`, `
       ${canEdit ? '' : `<div class="hint">${esc(t.readOnly)}</div>`}
-      <div class="list" role="list">${rows || `<div class="hint">${esc(this._weeks || !canEdit ? t.noSchedules : t.loading)}</div>`}</div>`;
+      <div class="list" role="list">${rows || `<div class="hint">${esc(this._weeks || !canEdit ? t.noSchedules : t.loading)}</div>`}</div>`);
   }
 
   _rowHtml(e, reg, now, canEdit) {
@@ -1841,12 +1870,11 @@ class BeitShabbatCard extends BeitCardBase {
       root.addEventListener('change', (e) => this._onChange(e));
     }
     const t = this._t;
-    const body = root.querySelector('.body');
-    body.setAttribute('dir', this._dirAttr());
-    body.innerHTML = `
-      ${this._config.title !== '' ? `<div class="header"><h2>${esc(this._config.title ?? t.shabbatAndChag)}</h2></div>` : ''}
-      ${this._config.show_calendar !== false ? this._calendarHtml(states, cal) : ''}
-      ${modes.map((m) => this._modeHtml(m, members[m], cal)).join('')}`;
+    this._paint(
+      this._config.title !== '' ? `<div class="header"><h2>${esc(this._config.title ?? t.shabbatAndChag)}</h2></div>` : '',
+      `${this._config.show_calendar !== false ? this._calendarHtml(states, cal) : ''}
+      ${modes.map((m) => this._modeHtml(m, members[m], cal)).join('')}`,
+    );
   }
 
   _calendarHtml(states, cal) {
@@ -2092,6 +2120,7 @@ class BeitScheduleCardEditor extends BeitEditorBase {
       <section>
         <h3>${esc(t.edGeneral)}</h3>
         <label class="field"><span>${esc(t.edTitle)}</span><input data-key="title" value="${esc(c.title ?? '')}" placeholder="${esc(t.schedules)}"></label>
+        <label class="field"><span>${esc(t.edHeight)}</span><input data-key="height" value="${esc(c.height ?? '')}" placeholder="${esc(t.edHeightHint)}"></label>
         <label class="chk"><input type="checkbox" data-bool="show_add" ${c.show_add !== false ? 'checked' : ''}><span>${esc(t.edShowAdd)}</span></label>
         <label class="chk"><input type="checkbox" data-bool="show_modes" ${showModes ? 'checked' : ''}><span>${esc(t.edShowModes)}</span></label>
         <p class="hint">${esc(t.edShowModesHint)}</p>
@@ -2144,13 +2173,14 @@ class BeitShabbatCardEditor extends BeitEditorBase {
       <section>
         <h3>${esc(t.edGeneral)}</h3>
         <label class="field"><span>${esc(t.edTitle)}</span><input data-key="title" value="${esc(c.title ?? '')}" placeholder="${esc(t.shabbatAndChag)}"></label>
+        <label class="field"><span>${esc(t.edHeight)}</span><input data-key="height" value="${esc(c.height ?? '')}" placeholder="${esc(t.edHeightHint)}"></label>
         <label class="chk"><input type="checkbox" data-bool="show_calendar" ${c.show_calendar !== false ? 'checked' : ''}><span>${esc(t.edShowCalendar)}</span></label>
       </section>
       <section>
         <h3>${esc(t.edModes)}</h3>
         ${MODES.map((m) => `<label class="chk"><input type="checkbox" data-mode="${esc(m)}" ${modes.includes(m) ? 'checked' : ''}><span>${MODE_GLYPH[m]} ${esc(t.modeTitle(t.modeName[m]))}</span></label>`).join('')}
       </section>`);
-    root.querySelector('[data-key]').addEventListener('change', (e) => this._emit({ ...this._config, title: e.target.value.trim() }));
+    root.querySelectorAll('[data-key]').forEach((el) => el.addEventListener('change', () => this._emit({ ...this._config, [el.dataset.key]: el.value.trim() })));
     root.querySelector('[data-bool]').addEventListener('change', (e) => {
       const config = { ...this._config, show_calendar: e.target.checked };
       if (e.target.checked) delete config.show_calendar;

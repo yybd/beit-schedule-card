@@ -124,6 +124,7 @@ visual editor.
 ```yaml
 type: custom:beit-schedule-card
 title: תזמונים            # optional
+height: 500px              # optional: fixed height, the list scrolls
 mode: שבת                  # optional: show only schedules in this mode (שבת / חג)
 entities:                  # optional: show only these schedules
   - schedule.living_room_ac
@@ -136,6 +137,7 @@ entities:                  # optional: show only these schedules
 | `entities` | list | all | Show only these schedule helpers. |
 | `hide_entities` | list | — | Hide these schedule helpers. |
 | `show_add` | boolean | `true` | Show the **New schedule** button. |
+| `height` | string | auto | A fixed height, such as `500px` or `60vh`. The title stays put and the list scrolls inside the card. |
 | `show_modes` | boolean | `true` | Show Shabbat and chag: the mode chips and the mode choice in the editor. Turn it off if you have no use for them. |
 
 ### Shabbat and chag card
@@ -150,6 +152,7 @@ show_calendar: true        # optional
 |---|---|---|---|
 | `title` | string | `שבת וחג` | Card title. |
 | `modes` | list | `[שבת, חג]` | Which modes to show. |
+| `height` | string | auto | A fixed height, such as `500px` or `60vh`. The title stays put and the rest scrolls inside the card. |
 | `show_calendar` | boolean | `true` | Show candle lighting, havdalah, the parasha and the holiday. |
 
 ## Shabbat and chag modes

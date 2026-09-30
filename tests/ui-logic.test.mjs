@@ -75,3 +75,14 @@ test('calendarRows: Jewish Calendar first, Hebcal where it has nothing', () => {
   assert.equal(h.date, 'יום ראשון, ט״ו בטבת תשפ״ו');
   assert.deepEqual(h.rows.find((r) => r.label === 'הדלקת נרות').value, '16:26');
 });
+
+import { cssHeight } from '../dist/beit-schedule-card.js';
+
+test('cssHeight: a bare number is pixels, other units pass through, empty is automatic', () => {
+  assert.equal(cssHeight(500), '500px');
+  assert.equal(cssHeight('420'), '420px');
+  assert.equal(cssHeight('60vh'), '60vh');
+  assert.equal(cssHeight(' 30rem '), '30rem');
+  assert.equal(cssHeight(''), null);
+  assert.equal(cssHeight(undefined), null);
+});
