@@ -1,6 +1,6 @@
 {
-  "name": "Beit Weekly Schedule",
-  "filename": "beit-schedule-card.js",
+  "name": "Schedule Helper Card",
+  "filename": "schedule-helper-card.js",
   "homeassistant": "2025.1.0",
   "render_readme": true
 }

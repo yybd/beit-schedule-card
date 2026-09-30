@@ -30,7 +30,7 @@ export async function startServer(port = 8766) {
 /** A headless Chrome with one page. `page.cmd(method, params)` speaks the DevTools protocol. */
 export async function launchChrome({ port = 9339 } = {}) {
   const bin = process.env.CHROME || (existsSync(MAC_CHROME) ? MAC_CHROME : 'google-chrome');
-  const profile = mkdtempSync(join(tmpdir(), 'beit-chrome-'));
+  const profile = mkdtempSync(join(tmpdir(), 'schedule-helper-chrome-'));
   const args = ['--headless=new', `--remote-debugging-port=${port}`, '--hide-scrollbars', '--disable-gpu', `--user-data-dir=${profile}`];
   // GitHub's runners do not allow Chrome's sandbox, and their /dev/shm is small.
   if (process.env.CI) args.push('--no-sandbox', '--disable-dev-shm-usage');

@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import {
   WeekSchedule, parseBlock, formatBlock, blockLabel, DAYS, BEIT_MARKER, buildScheduleAutomation, onActions, offActions,
   isOurs, schedulesIn, modeState, findCalendar, autoShabbatEndTrigger, buildAutoShabbatAutomation, AUTO_SHABBAT_ALIAS,
-} from '../dist/beit-schedule-card.js';
+} from '../dist/schedule-helper-card.js';
 
 const fixture = (name) => JSON.parse(readFileSync(new URL(`fixtures/${name}.json`, import.meta.url)));
 

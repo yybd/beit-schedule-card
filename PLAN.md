@@ -1,5 +1,8 @@
 # Plan: Beit Schedule Card v1.0
 
+> Renamed in 2.0: the card is now **Schedule Helper Card** (`dist/schedule-helper-card.js`, `custom:schedule-helper-card`,
+> `custom:schedule-helper-shabbat-card`). This plan keeps the 1.0 names it was written with.
+
 The goal is a HACS dashboard plugin, one file `dist/beit-schedule-card.js`, that registers two cards,
 `beit-schedule-card` and `beit-shabbat-card`. It does everything the README promises and follows the data contract in
 [docs/contract.md](docs/contract.md) exactly.

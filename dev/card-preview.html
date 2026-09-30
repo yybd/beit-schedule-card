@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Beit Weekly Schedule preview</title>
+<title>Schedule Helper Card preview</title>
 <style>
   /* Home Assistant's theme variables, light and dark. */
   :root {
@@ -32,8 +32,8 @@
 <!-- Dev harness. Offline: a fake hass over the synthetic fixtures (tests/fixtures). Writes change only the page's memory. -->
 <div class="bar" id="bar"></div>
 <div class="grid">
-  <beit-schedule-card id="schedules"></beit-schedule-card>
-  <beit-shabbat-card id="shabbat"></beit-shabbat-card>
+  <schedule-helper-card id="schedules"></schedule-helper-card>
+  <schedule-helper-shabbat-card id="shabbat"></schedule-helper-shabbat-card>
 </div>
 <div id="log"></div>
 <script type="module">
@@ -45,7 +45,7 @@
         border-radius: var(--ha-card-border-radius, 12px); border: 1px solid var(--ha-card-border-color, #e0e0e0); color: var(--primary-text-color); }</style><slot></slot>`;
     }
   });
-  await import('../dist/beit-schedule-card.js');
+  await import('../dist/schedule-helper-card.js');
   import { FakeHass } from '../tests/fake-hass.mjs';
 
   const q = new URLSearchParams(location.search);

@@ -1,7 +1,7 @@
 // The small pieces of display logic that don't need a DOM.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatWhen, langOf } from '../dist/beit-schedule-card.js';
+import { formatWhen, langOf } from '../dist/schedule-helper-card.js';
 
 test('formatWhen: today, tomorrow, a weekday', () => {
   const now = new Date(2026, 0, 4, 9, 0); // Sunday
@@ -23,7 +23,7 @@ test('langOf reads hass.locale, then hass.language', () => {
 });
 
 import { readFileSync } from 'node:fs';
-import { deviceSections, actionOptions } from '../dist/beit-schedule-card.js';
+import { deviceSections, actionOptions } from '../dist/schedule-helper-card.js';
 
 const fx = (n) => JSON.parse(readFileSync(new URL(`fixtures/${n}.json`, import.meta.url)));
 
@@ -62,7 +62,7 @@ test('actionOptions per device', () => {
   assert.equal(actionOptions(states['switch.hot_plate']).temp, null);
 });
 
-import { calendarRows, findCalendar } from '../dist/beit-schedule-card.js';
+import { calendarRows, findCalendar } from '../dist/schedule-helper-card.js';
 
 test('calendarRows: Jewish Calendar first, Hebcal where it has nothing', () => {
   const states = Object.fromEntries(fx('states').map((s) => [s.entity_id, s]));
@@ -80,7 +80,7 @@ test('calendarRows: Jewish Calendar first, Hebcal where it has nothing', () => {
   assert.deepEqual(h.rows.find((r) => r.label === 'הדלקת נרות').value, '16:26');
 });
 
-import { cssHeight } from '../dist/beit-schedule-card.js';
+import { cssHeight } from '../dist/schedule-helper-card.js';
 
 test('cssHeight: a bare number is pixels, other units pass through, empty is automatic', () => {
   assert.equal(cssHeight(500), '500px');
@@ -91,7 +91,7 @@ test('cssHeight: a bare number is pixels, other units pass through, empty is aut
   assert.equal(cssHeight(undefined), null);
 });
 
-import { parseTimeInput } from '../dist/beit-schedule-card.js';
+import { parseTimeInput } from '../dist/schedule-helper-card.js';
 
 test('parseTimeInput reads 24-hour times however they are typed', () => {
   const cases = { '7': 420, '07': 420, '7:30': 450, '07:30': 450, '730': 450, '0730': 450, '2330': 1410, '23.30': 1410,
@@ -114,7 +114,7 @@ test('deviceSections honours the card device_domains and the picker type chip', 
   assert.equal(ids({ ...data, domains: [] }).length, ids(data).length, 'an empty list means all');
 });
 
-import { actionSummary } from '../dist/beit-schedule-card.js';
+import { actionSummary } from '../dist/schedule-helper-card.js';
 
 test('actionSummary says what a schedule does to its device', () => {
   assert.equal(actionSummary({ entityId: 'climate.a', hvacMode: 'cool', temperature: 24 }, 'he'), 'בתחילת הטווח: נדלק (קירור, 24°) · בסופו: נכבה');

@@ -5,7 +5,7 @@
 // entity_registry/update replaces an entity's labels, automation.turn_on/off honours entity and label targets.
 // It runs in node and in the browser: no imports, fixtures are passed in.
 
-import { WeekSchedule, weekStatus, DAYS } from '../dist/beit-schedule-card.js';
+import { WeekSchedule, weekStatus, DAYS } from '../dist/schedule-helper-card.js';
 
 const clone = (x) => JSON.parse(JSON.stringify(x));
 

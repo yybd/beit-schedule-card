@@ -92,7 +92,7 @@ Written with `POST /api/config/automation/config/<id>`. From a card this is `has
     The start trigger (`id: erev_shabbat`) may instead be a time of day `HH:MM:00`, or
     `{at: {entity_id: sensor.jewish_calendar_upcoming_shabbat_candle_lighting*, offset: "-HH:MM:00"}}`; the
     `weekday: [fri]` condition stays. Changing the start replaces only that trigger (and the description while it is
-    still the one Beit wrote).
+    still the one the card wrote).
   - When Shabbat ends (see §4), it waits until every `schedule.*` carrying the label is off (6 h timeout), then turns the label off with `stop_actions: false`.
   - The card creates it on request, and **recognises** an existing one, so there is never a second: by its alias, or, if
     renamed, as an automation found by `search/related` for the label that carries the marker and an `erev_*` trigger.
@@ -106,13 +106,14 @@ Written with `POST /api/config/automation/config/<id>`. From a card this is `has
   - Neither automatic automation is ever a member of a mode: it would switch itself off.
   - The Beit app does not create automatic chag yet; it sees it as an ordinary automation carrying the marker.
 
-## 3a. The Beit Schedule dashboard
+## 3a. The Schedule Helper dashboard
 
 On request (a button in either card's visual editor, admins only) the card creates one new storage dashboard:
-`lovelace/dashboards/create {url_path: "beit-schedules", title: "Beit Schedule", icon: "mdi:calendar-clock", show_in_sidebar: true,
+`lovelace/dashboards/create {url_path: "schedule-helper", title: "Schedule Helper", icon: "mdi:calendar-clock", show_in_sidebar: true,
 require_admin: false, mode: "storage"}`, then `lovelace/config/save` with one view holding both cards. If a dashboard with
 that `url_path` exists, nothing is written. If the save fails, the new dashboard is deleted again
-(`lovelace/dashboards/delete {dashboard_id}`). No existing dashboard is ever changed.
+(`lovelace/dashboards/delete {dashboard_id}`). No existing dashboard is ever changed. A dashboard at `beit-schedules` (the address before 2.0) counts as
+existing too.
 
 ## 4. Calendar sources
 

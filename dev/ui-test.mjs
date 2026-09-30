@@ -51,6 +51,18 @@ const CHECKS = [
     must(B().querySelectorAll('[data-automode]').length === 2, 'automatic Shabbat and chag');
     must(B().querySelector('.cal-date').textContent.includes('טבת'), 'calendar');
   `],
+  ['the card types from before 2.0 still render', '', `
+    for (const tag of ['beit-schedule-card', 'beit-shabbat-card']) {
+      const el = document.createElement(tag);
+      el.setConfig({});
+      el.hass = fake.snapshot();
+      document.body.appendChild(el);
+      await sleep(300);
+      must(el.shadowRoot?.querySelector(tag === 'beit-schedule-card' ? '.row' : '.mode'), tag + ' renders');
+      el.remove();
+    }
+    must(!window.customCards.some((c) => c.type.startsWith('beit-')), 'old names are not offered in the picker');
+  `],
   ['a non-admin sees everything, edits nothing', 'admin=0', `
     must(!S().querySelector('[data-act=new]'), 'no New schedule');
     must(S().querySelectorAll('.row[data-id]').length === 0, 'no editable rows');
@@ -210,22 +222,22 @@ const CHECKS = [
     const sc = S().querySelector('.scroll');
     must(sc.scrollHeight > sc.clientHeight && getComputedStyle(sc).overflowY === 'auto', 'scrolls');
   `],
-  ['the visual editor creates the Beit dashboard, once', 'editors=1', `
-    const ed = document.querySelector('beit-schedule-card-editor').shadowRoot;
+  ['the visual editor creates the Schedule Helper dashboard, once', 'editors=1', `
+    const ed = document.querySelector('schedule-helper-card-editor').shadowRoot;
     await sleep(200);
     click(ed.querySelector('[data-act=makeDash]'), 'create button');
     await sleep(300);
-    must(fake._dashboards.some((d) => d.url_path === 'beit-schedules'), 'dashboard created');
-    must(fake._lovelace['beit-schedules'].views[0].cards.length === 2, 'with both cards');
-    must(ed.querySelector('[data-dash] a[href="/beit-schedules/beit"]'), 'Open link');
+    must(fake._dashboards.some((d) => d.url_path === 'schedule-helper'), 'dashboard created');
+    must(fake._lovelace['schedule-helper'].views[0].cards.length === 2, 'with both cards');
+    must(ed.querySelector('[data-dash] a[href="/schedule-helper"]'), 'Open link');
     must(!ed.querySelector('[data-act=makeDash]'), 'no second button');
   `],
   ['a non-admin editor offers no dashboard', 'editors=1&admin=0', `
     await sleep(300);
-    must(document.querySelector('beit-schedule-card-editor').shadowRoot.querySelector('[data-dash]').hidden, 'hidden');
+    must(document.querySelector('schedule-helper-card-editor').shadowRoot.querySelector('[data-dash]').hidden, 'hidden');
   `],
   ['the visual editor limits device types', 'editors=1', `
-    const ed = document.querySelector('beit-schedule-card-editor').shadowRoot;
+    const ed = document.querySelector('schedule-helper-card-editor').shadowRoot;
     toggle(ed.querySelector('[data-domain=climate]'), false, 'climate');
     await sleep(100);
     click(S().querySelector('[data-act=new]'), 'new');

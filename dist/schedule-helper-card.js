@@ -1,8 +1,10 @@
 /*
- * Beit Weekly Schedule — weekly schedules for any device, with optional Shabbat and Jewish holiday modes.
+ * Schedule Helper Card — weekly schedules for any device, with optional Shabbat and Jewish holiday modes.
  *
- *   type: custom:beit-schedule-card
- *   type: custom:beit-shabbat-card
+ *   type: custom:schedule-helper-card
+ *   type: custom:schedule-helper-shabbat-card
+ *
+ * Until 2.0 the cards were `custom:beit-schedule-card` and `custom:beit-shabbat-card`; those types still work.
  *
  * Everything the card writes is a native Home Assistant object: a `schedule` helper and an ordinary automation,
  * and a label per mode. The data shapes are fixed by docs/contract.md, shared with the Beit app.
@@ -11,7 +13,7 @@
  * Custom elements are registered only where `customElements` exists.
  */
 
-export const VERSION = '1.2.4';
+export const VERSION = '2.0.0';
 
 // ---------------------------------------------------------------------------- week model
 
@@ -115,7 +117,7 @@ export class WeekSchedule {
 
 // ---------------------------------------------------------------------------- the automation a schedule drives
 
-/** Marks automations Beit wrote, so it knows which ones it may rewrite or delete. */
+/** Marks automations this card (or the Beit app, which shares the data) wrote, so it knows which ones it may rewrite or delete. */
 export const BEIT_MARKER = 'נוצר באפליקציית Beit';
 
 /**
@@ -186,7 +188,7 @@ export function buildScheduleAutomation({ id, scheduleEntityId, scheduleName, ta
   };
 }
 
-/** True for an automation config Beit wrote (and so may rewrite or delete). */
+/** True for an automation config carrying the marker (so the card may rewrite or delete it). */
 export const isOurs = (config) => String(config?.description ?? '').includes(BEIT_MARKER);
 
 // Key order is HA's business; compare configs by content.
@@ -584,7 +586,7 @@ export async function createScheduleWithAutomation(hass, week, target, { labelNa
 }
 
 /**
- * Deletes a schedule and the automations driving it that Beit wrote. Automations written by hand are left alone;
+ * Deletes a schedule and the automations driving it that carry the marker. Automations written by hand are left alone;
  * their names are returned.
  */
 export async function deleteSchedule(hass, scheduleEntityId, scheduleId = scheduleEntityId.slice('schedule.'.length)) {
@@ -599,7 +601,7 @@ export async function deleteSchedule(hass, scheduleEntityId, scheduleId = schedu
 }
 
 /**
- * Rewrites the automation Beit wrote for a schedule, under the same id, to drive `target` (and carry the schedule's
+ * Rewrites the automation the card wrote for a schedule, under the same id, to drive `target` (and carry the schedule's
  * current name). Only for a config parseScheduleAutomation understands. Returns false when nothing would change.
  */
 export async function rewriteScheduleAutomation(hass, config, { scheduleName, target }) {
@@ -617,7 +619,7 @@ export async function rewriteScheduleAutomation(hass, config, { scheduleName, ta
 }
 
 /**
- * After a schedule is renamed: the automations Beit wrote for it follow, but only those still named
+ * After a schedule is renamed: the automations the card wrote for it follow, but only those still named
  * `Beit · <old name>`; an alias the user changed stays. Returns the entity ids that were renamed.
  */
 export async function renameScheduleAutomations(hass, automationEntityIds, oldName, newName) {
@@ -788,7 +790,7 @@ export async function disableAuto(hass, mode) {
 
 /**
  * Changes when an automatic mode switches on. Only its start trigger is replaced (and the description, if it is still
- * the one Beit wrote); everything else in the automation stays as it is. Only for one carrying the marker.
+ * the one the card wrote); everything else in the automation stays as it is. Only for one carrying the marker.
  */
 export async function setAutoStart(hass, mode, start) {
   const existing = await findAuto(hass, mode);
@@ -812,41 +814,44 @@ export const findAutoShabbat = (hass) => findAuto(hass, 'שבת');
 export const enableAutoShabbat = (hass, options) => enableAuto(hass, 'שבת', options);
 export const disableAutoShabbat = (hass) => disableAuto(hass, 'שבת');
 
-// ---- the Beit dashboard ----
+// ---- the Schedule Helper dashboard ----
 
 /** The dashboard the card can create: a new one in the sidebar, with both cards. Never an existing one changed. */
-export const BEIT_DASHBOARD = { url_path: 'beit-schedules', view: 'beit', title: 'Beit Schedule', icon: 'mdi:calendar-clock' };
+export const DASHBOARD = { url_path: 'schedule-helper', view: 'schedules', title: 'Schedule Helper', icon: 'mdi:calendar-clock' };
+// Where the dashboard lived before the card was renamed (1.2.x): found too, so it is never made twice.
+const LEGACY_DASHBOARD_PATHS = ['beit-schedules'];
 
-export function beitDashboardConfig() {
+export function dashboardConfig() {
   return {
-    title: BEIT_DASHBOARD.title,
-    views: [{ title: BEIT_DASHBOARD.title, path: BEIT_DASHBOARD.view, cards: [{ type: 'custom:beit-schedule-card' }, { type: 'custom:beit-shabbat-card' }] }],
+    title: DASHBOARD.title,
+    views: [{ title: DASHBOARD.title, path: DASHBOARD.view, cards: [{ type: 'custom:schedule-helper-card' }, { type: 'custom:schedule-helper-shabbat-card' }] }],
   };
 }
 
-export async function findBeitDashboard(hass) {
+export async function findDashboard(hass) {
   const list = await hass.callWS({ type: 'lovelace/dashboards/list' });
-  return list.find((d) => d.url_path === BEIT_DASHBOARD.url_path) || null;
+  return list.find((d) => d.url_path === DASHBOARD.url_path)
+    || list.find((d) => LEGACY_DASHBOARD_PATHS.includes(d.url_path)) || null;
 }
 
 /**
- * Creates the Beit dashboard. If one is already at that address it is left as it is (`created: false`). If its
+ * Creates the Schedule Helper dashboard. If one is already at that address it is left as it is (`created: false`). If its
  * content cannot be saved, the empty dashboard just created is removed again.
  */
-export async function createBeitDashboard(hass) {
-  const existing = await findBeitDashboard(hass);
+export async function createDashboard(hass) {
+  const existing = await findDashboard(hass);
   if (existing) return { ...existing, created: false };
   const created = await hass.callWS({
     type: 'lovelace/dashboards/create',
-    url_path: BEIT_DASHBOARD.url_path,
-    title: BEIT_DASHBOARD.title,
-    icon: BEIT_DASHBOARD.icon,
+    url_path: DASHBOARD.url_path,
+    title: DASHBOARD.title,
+    icon: DASHBOARD.icon,
     show_in_sidebar: true,
     require_admin: false,
     mode: 'storage',
   });
   try {
-    await hass.callWS({ type: 'lovelace/config/save', url_path: BEIT_DASHBOARD.url_path, config: beitDashboardConfig() });
+    await hass.callWS({ type: 'lovelace/config/save', url_path: DASHBOARD.url_path, config: dashboardConfig() });
   } catch (err) {
     await hass.callWS({ type: 'lovelace/dashboards/delete', dashboard_id: created.id }).catch(() => {});
     throw err;
@@ -1068,10 +1073,10 @@ export const STRINGS = {
     edNone: 'כלום',
     edModes: 'מצבים',
     edShowCalendar: 'הצגת זמני השבת והחג',
-    edDashboard: 'דשבורד Beit Schedule בסרגל הצד',
-    edDashboardHint: 'יוצר דשבורד חדש בשם Beit Schedule עם שני הכרטיסים. דשבורדים קיימים לא משתנים.',
-    edDashboardCreate: 'צור דשבורד Beit Schedule',
-    edDashboardExists: 'הדשבורד Beit Schedule כבר קיים.',
+    edDashboard: 'דשבורד Schedule Helper בסרגל הצד',
+    edDashboardHint: 'יוצר דשבורד חדש בשם Schedule Helper עם שני הכרטיסים. דשבורדים קיימים לא משתנים.',
+    edDashboardCreate: 'צור דשבורד Schedule Helper',
+    edDashboardExists: 'הדשבורד כבר קיים.',
     edDashboardCreated: 'הדשבורד נוצר ומופיע בסרגל הצד.',
     edDashboardOpen: 'פתח',
     edHeight: 'גובה',
@@ -1205,10 +1210,10 @@ export const STRINGS = {
     edNone: 'None',
     edModes: 'Modes',
     edShowCalendar: 'Show Shabbat and chag times',
-    edDashboard: 'A Beit Schedule dashboard in the sidebar',
-    edDashboardHint: 'Creates a new dashboard named Beit Schedule with both cards. Existing dashboards are not changed.',
-    edDashboardCreate: 'Create the Beit Schedule dashboard',
-    edDashboardExists: 'The Beit Schedule dashboard already exists.',
+    edDashboard: 'A Schedule Helper dashboard in the sidebar',
+    edDashboardHint: 'Creates a new dashboard named Schedule Helper with both cards. Existing dashboards are not changed.',
+    edDashboardCreate: 'Create the Schedule Helper dashboard',
+    edDashboardExists: 'The dashboard already exists.',
     edDashboardCreated: 'The dashboard was created; it is in the sidebar.',
     edDashboardOpen: 'Open',
     edHeight: 'Height',
@@ -1311,7 +1316,7 @@ const switchHtml = ({ checked = false, partial = false, disabled = false, label 
 const Base = globalThis.HTMLElement || class {};
 
 /** What both cards share: shadow root, language, a live adapter over hass for the ops, the label registry, a toast. */
-class BeitCardBase extends Base {
+class CardBase extends Base {
   constructor() {
     super();
     // The ops wait for entities to appear, so they need the latest hass, not the one they started with.
@@ -1430,15 +1435,15 @@ class BeitCardBase extends Base {
   }
 }
 
-// ---------------------------------------------------------------------------- beit-schedule-card
+// ---------------------------------------------------------------------------- schedule-helper-card
 
-class BeitScheduleCard extends BeitCardBase {
+class ScheduleHelperCard extends CardBase {
   static getStubConfig() {
     return { show_add: true };
   }
 
   static getConfigElement() {
-    return document.createElement('beit-schedule-card-editor');
+    return document.createElement('schedule-helper-card-editor');
   }
 
   setConfig(config) {
@@ -1671,7 +1676,7 @@ class ScheduleEditor {
     this.brightness = null;
     this.turnOffAtEnd = true;
     this.automations = null; // existing schedule: the automations it drives
-    this.driven = null; // existing schedule: {automation, config, parsed} for the one automation Beit can rewrite
+    this.driven = null; // existing schedule: {automation, config, parsed} for the one automation the card can rewrite
     this.handEdited = false;
     this.rangeEdit = null; // {day, index}
     this.copyFrom = null; // {day, chosen: Set}
@@ -1722,7 +1727,7 @@ class ScheduleEditor {
     }
   }
 
-  /** The automation Beit wrote for this schedule, if it can be rewritten: then device and action become editable. */
+  /** The automation the card wrote for this schedule, if it can be rewritten: then device and action become editable. */
   async loadDriven(automations) {
     const h = this.card._h;
     const ours = [];
@@ -2162,7 +2167,7 @@ class ScheduleEditor {
         await this.automationsReady; // mode and rename need the linked automations
         await updateSchedule(h, this.id, this.week);
         if (this.driven) {
-          // The alias follows the new name only while it is still the one Beit gave it; renameScheduleAutomations decides.
+          // The alias follows the new name only while it is still the one the card gave it; renameScheduleAutomations decides.
           const followsName = this.driven.config.alias === scheduleAlias(this.originalName.trim());
           await rewriteScheduleAutomation(h, this.driven.config, {
             scheduleName: followsName ? this.week.name : undefined,
@@ -2172,7 +2177,7 @@ class ScheduleEditor {
         await renameScheduleAutomations(h, this.automations || [], this.originalName, this.week.name);
         // Only when the user changed it: the automations may carry a mode the schedule itself does not.
         if (this.mode !== this.originalMode) {
-          // Only the automations Beit wrote for this schedule move: one the user wrote may only mention it.
+          // Only the automations the card wrote for this schedule move: one the user wrote may only mention it.
           const autos = this.oursAutomations || [];
           const ids = [this.entityId, ...autos];
           for (const m of MODES) await setModeMembership(h, m, ids, this.mode === m);
@@ -2328,7 +2333,7 @@ const SCHEDULE_STYLE = `
   .bar i { position: absolute; top: 0; bottom: 0; background: var(--primary-color); border-radius: 3px; }
 `;
 
-// ---------------------------------------------------------------------------- beit-shabbat-card
+// ---------------------------------------------------------------------------- schedule-helper-shabbat-card
 
 /** What the calendar block shows, from findCalendar: Jewish Calendar values first, Hebcal's where it has none. */
 export function calendarRows(states, cal, lang = 'en', now = new Date()) {
@@ -2355,13 +2360,13 @@ export function calendarRows(states, cal, lang = 'en', now = new Date()) {
   };
 }
 
-class BeitShabbatCard extends BeitCardBase {
+class ScheduleHelperShabbatCard extends CardBase {
   static getStubConfig() {
     return { modes: [...MODES], show_calendar: true };
   }
 
   static getConfigElement() {
-    return document.createElement('beit-shabbat-card-editor');
+    return document.createElement('schedule-helper-shabbat-card-editor');
   }
 
   setConfig(config) {
@@ -2747,7 +2752,7 @@ const SHABBAT_STYLE = `
 // ---------------------------------------------------------------------------- visual config editors
 
 /** Shared by both editors: HA echoes our own config-changed back through setConfig; re-rendering then would steal focus. */
-class BeitEditorBase extends Base {
+class EditorBase extends Base {
   setConfig(config) {
     if (this._emitted && JSON.stringify(config) === this._emitted) return;
     this._config = { ...config };
@@ -2767,12 +2772,12 @@ class BeitEditorBase extends Base {
     return STRINGS[langOf(this._hass)];
   }
 
-  // ---- "Create the Beit dashboard", shared by both editors ----
+  // ---- "Create the Schedule Helper dashboard", shared by both editors ----
 
   async _loadDash() {
     if (this._hass?.user?.is_admin === false) return;
     try {
-      this._dash = { existing: await findBeitDashboard(this._hass) };
+      this._dash = { existing: await findDashboard(this._hass) };
     } catch {
       this._dash = null; // no dashboards API here (e.g. YAML mode): no section
     }
@@ -2783,7 +2788,7 @@ class BeitEditorBase extends Base {
     this._dash = { ...this._dash, busy: true, error: null };
     this._renderDash();
     try {
-      const r = await createBeitDashboard(this._hass);
+      const r = await createDashboard(this._hass);
       this._dash = { existing: r, created: r.created };
     } catch (err) {
       this._dash = { ...this._dash, busy: false, error: errorText(err) };
@@ -2801,7 +2806,7 @@ class BeitEditorBase extends Base {
       return;
     }
     el.hidden = false;
-    const href = `/${BEIT_DASHBOARD.url_path}/${BEIT_DASHBOARD.view}`;
+    const href = `/${d.existing?.url_path || DASHBOARD.url_path}`;
     el.innerHTML = `<h3>${esc(t.edDashboard)}</h3>
       ${d.existing
         ? `<p class="hint">${esc(d.created ? t.edDashboardCreated : t.edDashboardExists)} <a href="${esc(href)}" target="_top">${esc(t.edDashboardOpen)}</a></p>`
@@ -2829,7 +2834,7 @@ class BeitEditorBase extends Base {
   }
 }
 
-class BeitScheduleCardEditor extends BeitEditorBase {
+class ScheduleHelperCardEditor extends EditorBase {
   _render() {
     if (!this._config) return;
     const t = this._t;
@@ -2899,7 +2904,7 @@ class BeitScheduleCardEditor extends BeitEditorBase {
   }
 }
 
-class BeitShabbatCardEditor extends BeitEditorBase {
+class ScheduleHelperShabbatCardEditor extends EditorBase {
   _render() {
     if (!this._config) return;
     const t = this._t;
@@ -2955,29 +2960,35 @@ const CONFIG_EDITOR_STYLE = `
   .actions button { font: inherit; font-size: 12px; color: var(--primary-color); background: none; border: 0; padding: 0; cursor: pointer; }
 `;
 
-export { BeitScheduleCardEditor, BeitShabbatCardEditor };
+export { ScheduleHelperCardEditor, ScheduleHelperShabbatCardEditor };
 
-export { BeitScheduleCard, BeitShabbatCard, BeitCardBase };
+export { ScheduleHelperCard, ScheduleHelperShabbatCard, CardBase };
 
 if (typeof customElements !== 'undefined') {
-  console.info(`%c BEIT-WEEKLY-SCHEDULE %c ${VERSION} `, 'background:#ffa000;color:#000;font-weight:600', 'background:#333;color:#fff');
-  if (!customElements.get('beit-schedule-card')) customElements.define('beit-schedule-card', BeitScheduleCard);
-  if (!customElements.get('beit-shabbat-card')) customElements.define('beit-shabbat-card', BeitShabbatCard);
-  if (!customElements.get('beit-schedule-card-editor')) customElements.define('beit-schedule-card-editor', BeitScheduleCardEditor);
-  if (!customElements.get('beit-shabbat-card-editor')) customElements.define('beit-shabbat-card-editor', BeitShabbatCardEditor);
+  console.info(`%c SCHEDULE-HELPER-CARD %c ${VERSION} `, 'background:#03a9f4;color:#fff;font-weight:600', 'background:#333;color:#fff');
+  const define = (name, cls) => {
+    if (!customElements.get(name)) customElements.define(name, cls);
+  };
+  define('schedule-helper-card', ScheduleHelperCard);
+  define('schedule-helper-shabbat-card', ScheduleHelperShabbatCard);
+  define('schedule-helper-card-editor', ScheduleHelperCardEditor);
+  define('schedule-helper-shabbat-card-editor', ScheduleHelperShabbatCardEditor);
+  // The names before 2.0, so dashboards made with them keep working. Not offered in the card picker.
+  define('beit-schedule-card', class extends ScheduleHelperCard {});
+  define('beit-shabbat-card', class extends ScheduleHelperShabbatCard {});
   window.customCards = window.customCards || [];
-  if (!window.customCards.some((c) => c.type === 'beit-schedule-card')) {
+  if (!window.customCards.some((c) => c.type === 'schedule-helper-card')) {
     window.customCards.push({
-      type: 'beit-schedule-card',
-      name: 'Beit Weekly Schedule',
+      type: 'schedule-helper-card',
+      name: 'Schedule Helper Card',
       description: 'Weekly schedules for any device, in any home; optional Shabbat and Jewish holiday modes. תזמון שבועי לכל מכשיר.',
       preview: false,
     });
   }
-  if (!window.customCards.some((c) => c.type === 'beit-shabbat-card')) {
+  if (!window.customCards.some((c) => c.type === 'schedule-helper-shabbat-card')) {
     window.customCards.push({
-      type: 'beit-shabbat-card',
-      name: 'Beit Weekly Schedule — Shabbat & Jewish holidays (שבת וחג)',
+      type: 'schedule-helper-shabbat-card',
+      name: 'Schedule Helper — Shabbat & Jewish holidays (שבת וחג)',
       description: 'Optional: Shabbat and Jewish holiday (chag) modes, automatic Shabbat and chag, and the times. מצבי שבת וחג.',
       preview: false,
     });

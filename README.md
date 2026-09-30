@@ -1,4 +1,4 @@
-<h1 align="center">Beit Weekly Schedule</h1>
+<h1 align="center">Schedule Helper Card</h1>
 
 <p align="center">
   <b>A weekly schedule card for any device</b>, for any home, on your Home Assistant dashboard.<br>
@@ -9,12 +9,12 @@
 
 <p align="center">
   <a href="https://github.com/hacs/integration"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS"></a>
-  <a href="https://github.com/yybd/beit-schedule-card/releases"><img src="https://img.shields.io/github/v/release/yybd/beit-schedule-card" alt="Release"></a>
-  <a href="https://github.com/yybd/beit-schedule-card/actions/workflows/validate.yml"><img src="https://github.com/yybd/beit-schedule-card/actions/workflows/validate.yml/badge.svg" alt="Validate"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/yybd/beit-schedule-card" alt="License"></a>
+  <a href="https://github.com/yybd/schedule-helper-card/releases"><img src="https://img.shields.io/github/v/release/yybd/schedule-helper-card" alt="Release"></a>
+  <a href="https://github.com/yybd/schedule-helper-card/actions/workflows/validate.yml"><img src="https://github.com/yybd/schedule-helper-card/actions/workflows/validate.yml/badge.svg" alt="Validate"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/yybd/schedule-helper-card" alt="License"></a>
 </p>
 
-<p align="center"><img src="https://raw.githubusercontent.com/yybd/beit-schedule-card/main/docs/card.png" alt="The schedules card and the Shabbat and Jewish holidays card" width="760"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/yybd/schedule-helper-card/main/docs/card.png" alt="The schedules card and the Shabbat and Jewish holidays card" width="760"></p>
 
 ---
 
@@ -23,7 +23,7 @@
 - [Two cards](#two-cards)
 - [Features](#features)
 - [Screenshots](#screenshots)
-- [Why Beit Weekly Schedule](#why-beit-weekly-schedule)
+- [Why Schedule Helper Card](#why-schedule-helper-card)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Configuration](#configuration)
@@ -47,8 +47,8 @@ The package contains **two separate cards**. Add one or both; each works on its 
 
 | | Card | What it is for |
 |:-:|---|---|
-| 🗓️ | **Schedules**<br>`custom:beit-schedule-card`<br>*the main card, for every home* | **Setting up schedules.** Create and edit a weekly schedule for any device (air conditioner, heating, lights, water heater, plugs, blinds): the hours for each day, and what the device does. To hide everything about Shabbat and chag, set `show_modes: false`. |
-| 🕯️ | **Shabbat & Jewish holidays**<br>`custom:beit-shabbat-card`<br>*optional* | **For homes that keep Shabbat and the Jewish holidays (chag).** Switch each mode on or off, choose which automations belong to it, set automatic Shabbat and chag, and see candle lighting, havdalah and the parasha. |
+| 🗓️ | **Schedules**<br>`custom:schedule-helper-card`<br>*the main card, for every home* | **Setting up schedules.** Create and edit a weekly schedule for any device (air conditioner, heating, lights, water heater, plugs, blinds): the hours for each day, and what the device does. To hide everything about Shabbat and chag, set `show_modes: false`. |
+| 🕯️ | **Shabbat & Jewish holidays**<br>`custom:schedule-helper-shabbat-card`<br>*optional* | **For homes that keep Shabbat and the Jewish holidays (chag).** Switch each mode on or off, choose which automations belong to it, set automatic Shabbat and chag, and see candle lighting, havdalah and the parasha. |
 
 ## Features
 
@@ -86,18 +86,18 @@ Hebrew, the cards are in Hebrew and the whole layout is right to left.
 
 | Editing a schedule | A new schedule for an air conditioner |
 |:-:|:-:|
-| <img src="https://raw.githubusercontent.com/yybd/beit-schedule-card/main/docs/editor.png" alt="The editor: name, Shabbat mode, the automations it drives and the week" width="380"> | <img src="https://raw.githubusercontent.com/yybd/beit-schedule-card/main/docs/new-schedule.png" alt="A new schedule: the device, HVAC mode, temperature and turn off at the end" width="380"> |
+| <img src="https://raw.githubusercontent.com/yybd/schedule-helper-card/main/docs/editor.png" alt="The editor: name, Shabbat mode, the automations it drives and the week" width="380"> | <img src="https://raw.githubusercontent.com/yybd/schedule-helper-card/main/docs/new-schedule.png" alt="A new schedule: the device, HVAC mode, temperature and turn off at the end" width="380"> |
 
 | Dark theme, fixed height | On a phone |
 |:-:|:-:|
-| <img src="https://raw.githubusercontent.com/yybd/beit-schedule-card/main/docs/dark-english.png" alt="Both cards with a dark theme and a fixed height" width="440"> | <img src="https://raw.githubusercontent.com/yybd/beit-schedule-card/main/docs/mobile.png" alt="The editor full screen on a phone" width="220"> |
+| <img src="https://raw.githubusercontent.com/yybd/schedule-helper-card/main/docs/dark-english.png" alt="Both cards with a dark theme and a fixed height" width="440"> | <img src="https://raw.githubusercontent.com/yybd/schedule-helper-card/main/docs/mobile.png" alt="The editor full screen on a phone" width="220"> |
 
-## Why Beit Weekly Schedule
+## Why Schedule Helper Card
 
 Home Assistant already has good scheduling tools. This card makes a different trade-off. **It writes Home Assistant's
 own objects rather than bringing its own scheduling engine.**
 
-| | **Beit Weekly Schedule** | Built-in schedule helper editor | [Scheduler card + component](https://github.com/nielsfaber/scheduler-component) | [Weekly Schedule Card](https://community.home-assistant.io/t/weekly-schedule-card-a-visual-weekly-grid-card-for-the-scheduler-component/1012671) | [schedule_state](https://github.com/aneeshd/schedule_state) |
+| | **Schedule Helper Card** | Built-in schedule helper editor | [Scheduler card + component](https://github.com/nielsfaber/scheduler-component) | [Weekly Schedule Card](https://community.home-assistant.io/t/weekly-schedule-card-a-visual-weekly-grid-card-for-the-scheduler-component/1012671) | [schedule_state](https://github.com/aneeshd/schedule_state) |
 |---|:-:|:-:|:-:|:-:|:-:|
 | Stores schedules in HA's native `schedule` helper | ✅ | ✅ | ❌ own storage | ❌ scheduler component | ❌ own sensor |
 | Needs a custom integration on the server | **No** | No | Yes | Yes | Yes |
@@ -121,11 +121,11 @@ own objects rather than bringing its own scheduling engine.**
    - Automations ignore the brief "unavailable" state after a restart, so devices don't switch on or off on their own.
    - Deleting a schedule removes only the automation the card created. Automations you wrote yourself are left in
      place and listed.
-5. **One data model across apps.** The card and the Beit native app for iOS, Android, macOS and Windows read and
+5. **One data model across apps.** The card and its companion app, Beit, for iOS, Android, macOS and Windows read and
    write the same objects.
 
 **Where other tools go further.** The Scheduler card supports arbitrary service calls, conditions and sun-based times.
-The Weekly Schedule Card and the built-in editor let you draw ranges by dragging on a grid. Beit Weekly Schedule focuses
+The Weekly Schedule Card and the built-in editor let you draw ranges by dragging on a grid. Schedule Helper Card focuses
 on device schedules and Shabbat/chag modes.
 
 ## Requirements
@@ -140,32 +140,32 @@ on device schedules and Shabbat/chag modes.
 
 ### HACS (recommended)
 
-[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=yybd&repository=beit-schedule-card&category=plugin)
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=yybd&repository=schedule-helper-card&category=plugin)
 
 Or add it by hand:
 
 1. In Home Assistant, open **HACS**.
 2. Open the menu (⋮) → **Custom repositories**.
-3. Add `https://github.com/yybd/beit-schedule-card` with type **Dashboard**.
-4. Search for **Beit Weekly Schedule**, open it and select **Download**.
+3. Add `https://github.com/yybd/schedule-helper-card` with type **Dashboard**.
+4. Search for **Schedule Helper Card**, open it and select **Download**.
 5. Reload the browser.
 
 HACS registers the dashboard resource for you.
 
 ### Manual installation
 
-1. Download `beit-schedule-card.js` from the [latest release](https://github.com/yybd/beit-schedule-card/releases/latest).
-2. Copy it to `/config/www/beit-schedule-card.js`.
+1. Download `schedule-helper-card.js` from the [latest release](https://github.com/yybd/schedule-helper-card/releases/latest).
+2. Copy it to `/config/www/schedule-helper-card.js`.
 3. Go to *Settings → Dashboards → ⋮ → Resources → Add resource*.
-4. Enter the URL `/local/beit-schedule-card.js` with type **JavaScript module**.
+4. Enter the URL `/local/schedule-helper-card.js` with type **JavaScript module**.
 5. Reload the browser.
 
 ### Add the cards
 
 After installing, reload the browser. Then either:
 
-- **One click: a Beit Schedule dashboard.** Open any dashboard → ⋮ → *Edit dashboard* → *Add card* → **Beit Weekly
-  Schedule**. At the top of the card's editor, **Create the Beit Schedule dashboard** adds a new dashboard named *Beit Schedule*
+- **One click: a Schedule Helper dashboard.** Open any dashboard → ⋮ → *Edit dashboard* → *Add card* → **Schedule Helper
+  Card**. At the top of the card's editor, **Create the Schedule Helper dashboard** adds a new dashboard named *Schedule Helper*
   to the sidebar, with both cards. Nothing else is changed; if it already exists, the button offers to open it.
   You can close the Add card dialog without adding the card.
 - **By hand.** *Settings → Dashboards → Add dashboard → New dashboard from scratch*, name it, open it, then ⋮ → *Edit
@@ -173,13 +173,22 @@ After installing, reload the browser. Then either:
 
   ```yaml
   views:
-    - title: Beit Schedule
+    - title: Schedule Helper
       cards:
-        - type: custom:beit-schedule-card
-        - type: custom:beit-shabbat-card
+        - type: custom:schedule-helper-card
+        - type: custom:schedule-helper-shabbat-card
   ```
 
-  Or add the cards to any existing dashboard from *Add card*: search for **Beit**.
+  Or add the cards to any existing dashboard from *Add card*: search for **Schedule Helper**.
+
+### Upgrading from Beit Schedule Card (1.x)
+
+The card was called *Beit Schedule Card* until 2.0, in the repository `yybd/beit-schedule-card` (GitHub redirects the
+old address). Dashboards that use `custom:beit-schedule-card` or `custom:beit-shabbat-card` keep working. To move to 2.0:
+
+1. In HACS, remove *Beit Schedule Card* (or *Beit Weekly Schedule*), then add this repository again and download it.
+   The file is now `schedule-helper-card.js`; HACS registers the new resource.
+2. Optionally, change your cards' types to `custom:schedule-helper-card` and `custom:schedule-helper-shabbat-card`.
 
 ## Configuration
 
@@ -189,7 +198,7 @@ and configured in the visual editor.
 ### 🗓️ Schedules card
 
 ```yaml
-type: custom:beit-schedule-card
+type: custom:schedule-helper-card
 title: תזמונים            # optional
 height: 500px              # optional: fixed height, the list scrolls
 mode: שבת                  # optional: show only schedules in this mode (שבת / חג)
@@ -211,7 +220,7 @@ entities:                  # optional: show only these schedules
 ### 🕯️ Shabbat & Jewish holidays (chag) card (optional)
 
 ```yaml
-type: custom:beit-shabbat-card
+type: custom:schedule-helper-shabbat-card
 modes: [שבת, חג]           # optional
 show_calendar: true        # optional
 ```
@@ -251,8 +260,8 @@ For every schedule it creates, the card writes two standard Home Assistant objec
 2. **An automation** (`Beit · <name>`) that performs the "on" action when the schedule turns on and the "off" action
    when it turns off.
    - It ignores transitions from `unavailable`/`unknown`, so a restart never switches a device.
-   - Its description marks it as created by Beit. That is how the card knows which automations it may later edit or
-     delete.
+   - Its description carries a marker (shared with the companion Beit app). That is how the card knows which
+     automations it may later edit or delete.
 
 The full data model is documented in [docs/contract.md](docs/contract.md).
 

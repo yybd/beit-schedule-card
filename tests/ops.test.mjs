@@ -7,7 +7,7 @@ import {
   WeekSchedule, listSchedules, createScheduleWithAutomation, updateSchedule, deleteSchedule, automationsFor,
   setAutomationEnabled, ensureLabel, setModeMembership, setModeEnabled, modeMembers, loadRegistry, findAutoShabbat,
   enableAutoShabbat, disableAutoShabbat, isOurs, weekStatus, errorText, AUTO_SHABBAT_ALIAS, BEIT_MARKER,
-} from '../dist/beit-schedule-card.js';
+} from '../dist/schedule-helper-card.js';
 
 const NAMES = ['states', 'schedule_list', 'automation_configs', 'label_registry', 'entity_registry_display', 'area_registry', 'device_registry', 'yaml_schedules'];
 export const fixtures = Object.fromEntries(NAMES.map((n) => [n, JSON.parse(readFileSync(new URL(`fixtures/${n}.json`, import.meta.url)))]));
@@ -267,7 +267,7 @@ test('slugify approximates HA for Hebrew names', () => {
 
 // ---- renaming ------------------------------------------------------------------------------------------------------
 
-import { parseScheduleAutomation, renameScheduleAutomations, buildScheduleAutomation } from '../dist/beit-schedule-card.js';
+import { parseScheduleAutomation, renameScheduleAutomations, buildScheduleAutomation } from '../dist/schedule-helper-card.js';
 
 test('parseScheduleAutomation reads back exactly what the builder wrote, and nothing edited by hand', () => {
   for (const target of [
@@ -303,7 +303,7 @@ test('renaming a schedule renames only the Beit automations still named after it
   assert.deepEqual(await renameScheduleAutomations(house(), autos, 'x', 'x'), []);
 });
 
-import { rewriteScheduleAutomation } from '../dist/beit-schedule-card.js';
+import { rewriteScheduleAutomation } from '../dist/schedule-helper-card.js';
 
 test('rewriteScheduleAutomation changes device and action under the same id, and only when something changed', async () => {
   const hass = house();
@@ -326,7 +326,7 @@ test('rewriteScheduleAutomation changes device and action under the same id, and
 import {
   autoStartTrigger, parseAutoStart, autoAvailable, buildAutoModeAutomation, enableAuto, disableAuto, setAutoStart, findAuto,
   findCalendar, AUTO_ALIAS, startText,
-} from '../dist/beit-schedule-card.js';
+} from '../dist/schedule-helper-card.js';
 
 const calOf = (states) => findCalendar(Object.fromEntries(states.map((s) => [s.entity_id, s])));
 
@@ -403,7 +403,7 @@ test('setAutoStart replaces only the start trigger, and the description while it
   assert.equal(cfg.triggers[0].at, '13:00:00');
 });
 
-import { setAutomationInMode } from '../dist/beit-schedule-card.js';
+import { setAutomationInMode } from '../dist/schedule-helper-card.js';
 
 test('taking an automation out of a mode keeps a schedule another member still follows', async () => {
   const hass = house();
@@ -422,7 +422,7 @@ test('taking an automation out of a mode keeps a schedule another member still f
   assert.deepEqual(reg.entityLabels['schedule.water_heater_weekdays'], ['energy', 'khg']);
 });
 
-import { readSchedules } from '../dist/beit-schedule-card.js';
+import { readSchedules } from '../dist/schedule-helper-card.js';
 
 test('readSchedules reads UI and YAML weeks through get_schedule, which non-admins may call', async () => {
   const hass = house({ isAdmin: false });
@@ -436,7 +436,7 @@ test('readSchedules reads UI and YAML weeks through get_schedule, which non-admi
 
 // ---- found in the pre-release review ---------------------------------------------------------------------------
 
-import { schedulesIn, alignWithMode, scheduleIdsOf } from '../dist/beit-schedule-card.js';
+import { schedulesIn, alignWithMode, scheduleIdsOf } from '../dist/schedule-helper-card.js';
 
 test('an alias the user changed survives a rewrite of what the schedule does', async () => {
   const hass = house();
@@ -497,29 +497,29 @@ test('per-block data survives a round trip', () => {
   assert.deepEqual(w.clone().toHA().monday[0].data, { mode: 'eco' });
 });
 
-// ---- the Beit dashboard --------------------------------------------------------------------------------------------
+// ---- the Schedule Helper dashboard --------------------------------------------------------------------------------------------
 
-import { createBeitDashboard, findBeitDashboard, beitDashboardConfig, BEIT_DASHBOARD } from '../dist/beit-schedule-card.js';
+import { createDashboard, findDashboard, dashboardConfig, DASHBOARD } from '../dist/schedule-helper-card.js';
 
-test('createBeitDashboard makes one new dashboard with both cards, and only once', async () => {
+test('createDashboard makes one new dashboard with both cards, and only once', async () => {
   const hass = house();
-  assert.equal(await findBeitDashboard(hass), null);
-  const r = await createBeitDashboard(hass);
+  assert.equal(await findDashboard(hass), null);
+  const r = await createDashboard(hass);
   assert.equal(r.created, true);
-  assert.equal(r.url_path, 'beit-schedules');
-  const cfg = await hass.callWS({ type: 'lovelace/config', url_path: 'beit-schedules' });
-  assert.deepEqual(cfg.views[0].cards.map((c) => c.type), ['custom:beit-schedule-card', 'custom:beit-shabbat-card']);
-  assert.deepEqual(cfg, beitDashboardConfig());
-  const again = await createBeitDashboard(hass);
+  assert.equal(r.url_path, 'schedule-helper');
+  const cfg = await hass.callWS({ type: 'lovelace/config', url_path: 'schedule-helper' });
+  assert.deepEqual(cfg.views[0].cards.map((c) => c.type), ['custom:schedule-helper-card', 'custom:schedule-helper-shabbat-card']);
+  assert.deepEqual(cfg, dashboardConfig());
+  const again = await createDashboard(hass);
   assert.equal(again.created, false);
   assert.equal(hass.calls.filter((c) => c.type === 'lovelace/dashboards/create').length, 1);
   // The other dashboard was never touched.
-  assert.ok(!hass.calls.some((c) => c.type === 'lovelace/config/save' && c.url_path !== BEIT_DASHBOARD.url_path));
+  assert.ok(!hass.calls.some((c) => c.type === 'lovelace/config/save' && c.url_path !== DASHBOARD.url_path));
 });
 
-test('an existing dashboard at that address is left alone', async () => {
+test('a dashboard at the address used before the rename (1.2.x) counts as existing', async () => {
   const hass = new FakeHass({ ...fixtures, dashboards: [{ id: 'beit_schedules', url_path: 'beit-schedules', title: 'Mine', mode: 'storage' }] }, { now: SUNDAY_9AM });
-  const r = await createBeitDashboard(hass);
+  const r = await createDashboard(hass);
   assert.equal(r.created, false);
   assert.equal(r.title, 'Mine');
   assert.ok(!hass.calls.some((c) => c.type === 'lovelace/config/save' || c.type === 'lovelace/dashboards/create'));
@@ -528,6 +528,6 @@ test('an existing dashboard at that address is left alone', async () => {
 test('a dashboard whose content cannot be saved is removed again', async () => {
   const hass = house();
   hass.failNext('lovelace/config/save', 'boom');
-  await assert.rejects(createBeitDashboard(hass), /boom/);
-  assert.equal(await findBeitDashboard(hass), null);
+  await assert.rejects(createDashboard(hass), /boom/);
+  assert.equal(await findDashboard(hass), null);
 });
