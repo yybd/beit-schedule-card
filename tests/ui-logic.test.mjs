@@ -95,3 +95,17 @@ test('parseTimeInput reads 24-hour times however they are typed', () => {
   for (const [text, minutes] of Object.entries(cases)) assert.equal(parseTimeInput(text), minutes, text);
   for (const bad of ['', 'x', '25:00', '24:30', '7:60', '12345', '7:3', 'am', '-1']) assert.equal(parseTimeInput(bad), null, bad);
 });
+
+test('deviceSections honours the card device_domains and the picker type chip', () => {
+  const data = {
+    states: Object.fromEntries(fx('states').map((s) => [s.entity_id, s])),
+    display: fx('entity_registry_display'),
+    devices: fx('device_registry'),
+    areas: fx('area_registry'),
+  };
+  const ids = (d) => deviceSections(d).flatMap((s) => s.entities.map((e) => e.entity_id)).sort();
+  assert.deepEqual(ids({ ...data, domains: ['water_heater', 'cover'] }), ['cover.bedroom_shutter', 'water_heater.boiler']);
+  assert.deepEqual(ids({ ...data, only: 'climate' }), ['climate.bedroom_ac', 'climate.kids_ac', 'climate.living_room_ac']);
+  assert.deepEqual(ids({ ...data, domains: ['light'], only: 'climate' }), []);
+  assert.equal(ids({ ...data, domains: [] }).length, ids(data).length, 'an empty list means all');
+});

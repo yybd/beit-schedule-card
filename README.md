@@ -153,6 +153,7 @@ entities:                  # optional: show only these schedules
 | `hide_entities` | list | — | Hide these schedule helpers. |
 | `show_add` | boolean | `true` | Show the **New schedule** button. |
 | `height` | string | auto | A fixed height, such as `500px` or `60vh`. The title stays put and the list scrolls inside the card. |
+| `device_domains` | list | all | Device types offered when choosing a device, e.g. `[climate, light, water_heater]`. |
 | `show_modes` | boolean | `true` | Show Shabbat and chag: the mode chips and the mode choice in the editor. Turn it off if you have no use for them. |
 
 ### Shabbat and chag card

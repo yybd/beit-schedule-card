@@ -739,7 +739,7 @@ export const PICKABLE_DOMAINS = ['light', 'switch', 'fan', 'cover', 'climate', '
  * ones with no area. Hidden and auxiliary (config/diagnostic) entities are left out, as the app does.
  * `display` is `config/entity_registry/list_for_display`.
  */
-export function deviceSections({ states, display, devices = [], areas = [] }, query = '', noAreaTitle = 'ללא חדר', lang = 'he') {
+export function deviceSections({ states, display, devices = [], areas = [], domains = null, only = null }, query = '', noAreaTitle = 'ללא חדר', lang = 'he') {
   const meta = Object.fromEntries((display?.entities || []).map((e) => [e.ei, e]));
   const deviceArea = Object.fromEntries(devices.map((d) => [d.id, d.area_id]));
   const q = query.trim().toLowerCase();
@@ -747,6 +747,8 @@ export function deviceSections({ states, display, devices = [], areas = [] }, qu
   for (const e of Object.values(states || {})) {
     const domain = domainOf(e.entity_id);
     if (!PICKABLE_DOMAINS.includes(domain)) continue;
+    if (domains?.length && !domains.includes(domain)) continue; // the card's device_domains
+    if (only && domain !== only) continue; // the picker's type chip
     const m = meta[e.entity_id];
     if (m && (m.hb || m.ec !== undefined && m.ec !== null)) continue;
     const areaId = m?.ai ?? (m?.di ? deviceArea[m.di] : null) ?? null;
@@ -892,6 +894,11 @@ export const STRINGS = {
     edShowAdd: 'כפתור "תזמון חדש"',
     edShowModes: 'הצגת שבת וחג',
     edShowModesHint: 'כבו אם אין צורך במצבי שבת וחג: הכרטיס לא יציג אותם.',
+    edDeviceDomains: 'סוגי מכשירים לתזמון',
+    edDeviceDomainsHint: 'רק הסוגים המסומנים יופיעו בבחירת מכשיר.',
+    allTypes: 'הכול',
+    domainName: { light: 'תאורה', switch: 'מתגים ושקעים', fan: 'מאווררים', cover: 'תריסים', climate: 'מזגנים', water_heater: 'דודים',
+      media_player: 'נגנים', input_boolean: 'מתגים וירטואליים', vacuum: 'שואבים', siren: 'צופרים', valve: 'ברזים' },
     edModeFilter: 'הצגת תזמונים',
     edAllSchedules: 'כל התזמונים',
     edOnlyMode: (m) => `רק תזמוני ${m}`,
@@ -1012,6 +1019,11 @@ export const STRINGS = {
     edShowAdd: '"New schedule" button',
     edShowModes: 'Show Shabbat and chag',
     edShowModesHint: 'Turn off if you have no use for Shabbat and chag modes: the card will not show them.',
+    edDeviceDomains: 'Device types to schedule',
+    edDeviceDomainsHint: 'Only the ticked types appear when choosing a device.',
+    allTypes: 'All',
+    domainName: { light: 'Lights', switch: 'Switches & plugs', fan: 'Fans', cover: 'Covers', climate: 'Air conditioners', water_heater: 'Water heaters',
+      media_player: 'Media players', input_boolean: 'Virtual switches', vacuum: 'Vacuums', siren: 'Sirens', valve: 'Valves' },
     edModeFilter: 'Schedules shown',
     edAllSchedules: 'All schedules',
     edOnlyMode: (m) => `Only ${m} schedules`,
@@ -1248,6 +1260,7 @@ class BeitScheduleCard extends BeitCardBase {
   setConfig(config) {
     if (config?.entities && !Array.isArray(config.entities)) throw new Error('entities must be a list');
     if (config?.hide_entities && !Array.isArray(config.hide_entities)) throw new Error('hide_entities must be a list');
+    if (config?.device_domains && !Array.isArray(config.device_domains)) throw new Error('device_domains must be a list');
     this._config = { show_add: true, show_modes: true, ...config };
     this._sig = null;
     this._render();
@@ -1711,13 +1724,24 @@ class ScheduleEditor {
   pickerHtml() {
     const t = this.t;
     if (!this.picker) return `<div class="muted">${esc(t.loading)}</div>`;
-    return `<label class="search">${icon('search')}<input type="search" id="q" data-focus="q" data-autofocus placeholder="${esc(t.searchDevice)}"
-      aria-label="${esc(t.searchDevice)}" value="${esc(this.query)}"></label><div class="picker-list">${this.pickerListHtml()}</div>`;
+    // A chip per device type this house has (within the card's device_domains).
+    const present = new Set(deviceSections(this.pickerData()).flatMap((sec) => sec.entities.map((e) => domainOf(e.entity_id))));
+    const types = PICKABLE_DOMAINS.filter((d) => present.has(d));
+    const chip = (v, label) => `<button class="choice" role="radio" aria-checked="${(this.domainFilter ?? null) === v}" data-act="domain"
+      data-v="${esc(v ?? '')}" data-focus="domain-${esc(v ?? 'all')}">${esc(label)}</button>`;
+    return `<div class="picker-top"><label class="search">${icon('search')}<input type="search" id="q" data-focus="q" data-autofocus placeholder="${esc(t.searchDevice)}"
+      aria-label="${esc(t.searchDevice)}" value="${esc(this.query)}"></label>
+      ${types.length > 1 ? `<div class="chips types" role="radiogroup" aria-label="${esc(t.device)}">${chip(null, t.allTypes)}${types.map((d) => chip(d, t.domainName[d] || d)).join('')}</div>` : ''}</div>
+      <div class="picker-list">${this.pickerListHtml()}</div>`;
+  }
+
+  pickerData(only = null) {
+    return { states: this.card._hass.states, ...this.picker, domains: this.card._config.device_domains, only };
   }
 
   pickerListHtml() {
     const t = this.t;
-    const sections = deviceSections({ states: this.card._hass.states, ...this.picker }, this.query, t.noArea, this.lang);
+    const sections = deviceSections(this.pickerData(this.domainFilter), this.query, t.noArea, this.lang);
     if (!sections.length) return `<div class="muted">${esc(t.noDevices)}</div>`;
     return sections.map((sec) => `<div class="area">${esc(sec.title)}</div>${sec.entities.map((e) => `
       <button class="pick" data-act="choose" data-id="${esc(e.entity_id)}"><span class="grow">${esc(entityName(e))}</span>
@@ -1769,6 +1793,7 @@ class ScheduleEditor {
         break;
       }
       case 'hvac': this.hvacMode = el.dataset.v; break;
+      case 'domain': this.domainFilter = el.dataset.v || null; break;
       case 'temp': {
         const o = actionOptions(this.device);
         this.temperature = Math.min(o.temp.max, Math.max(o.temp.min, Math.round(this.temperature + Number(el.dataset.v))));
@@ -1988,7 +2013,11 @@ const EDITOR_STYLE = `
     text-align: center; font-variant-numeric: tabular-nums; }
   .actions { display: flex; gap: 8px; justify-content: flex-end; }
   .copy-days { display: flex; flex-wrap: wrap; gap: 6px 16px; }
-  .search { display: flex; align-items: center; gap: 8px; position: sticky; top: -16px; background: var(--card-background-color); padding: 4px 0 8px; z-index: 1; }
+  .picker-top { position: sticky; top: -16px; background: var(--card-background-color); padding: 4px 0 8px; z-index: 1; display: flex; flex-direction: column; gap: 8px; }
+  .search { display: flex; align-items: center; gap: 8px; background: var(--card-background-color); }
+  .picker-top .search { padding: 0; }
+  .chips.types { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+  .chips.types .choice { white-space: nowrap; font-size: 13px; padding: 4px 12px; }
   .search input { flex: 1; font-size: 16px; }
   .search .ic { color: var(--secondary-text-color); }
   .picker-list { display: flex; flex-direction: column; }
@@ -2500,6 +2529,12 @@ class BeitScheduleCardEditor extends BeitEditorBase {
         </select></label>` : ''}
       </section>
       <section>
+        <h3>${esc(t.edDeviceDomains)}</h3>
+        <p class="hint">${esc(t.edDeviceDomainsHint)}</p>
+        <div class="types">${PICKABLE_DOMAINS.map((d) => `<label class="chk"><input type="checkbox" data-domain="${esc(d)}"
+          ${!c.device_domains?.length || c.device_domains.includes(d) ? 'checked' : ''}><span>${esc(t.domainName[d])}</span></label>`).join('')}</div>
+      </section>
+      <section>
         <h3>${esc(t.edSchedules)}</h3>
         <p class="hint">${esc(t.edSchedulesHint)}</p>
         <div class="actions"><button data-all>${esc(t.edAll)}</button><button data-none>${esc(t.edNone)}</button></div>
@@ -2515,6 +2550,12 @@ class BeitScheduleCardEditor extends BeitEditorBase {
       if (el.dataset.bool === 'show_modes') this._render();
     }));
     root.querySelector('.list').addEventListener('change', () => this._saveSchedules());
+    root.querySelector('.types').addEventListener('change', () => {
+      const ticked = [...root.querySelectorAll('[data-domain]')].filter((b) => b.checked).map((b) => b.dataset.domain);
+      const config = { ...this._config, device_domains: ticked };
+      if (ticked.length === PICKABLE_DOMAINS.length) delete config.device_domains; // all is the default
+      this._emit(config);
+    });
     root.querySelector('[data-all]').addEventListener('click', () => this._setAll(true));
     root.querySelector('[data-none]').addEventListener('click', () => this._setAll(false));
   }
@@ -2578,6 +2619,7 @@ const CONFIG_EDITOR_STYLE = `
   .list { display: flex; flex-direction: column; max-height: 280px; overflow-y: auto; border: 1px solid var(--divider-color); border-radius: 10px; }
   .row { padding: 7px 10px; border-bottom: 1px solid var(--divider-color); }
   .row:last-child { border-bottom: 0; }
+  .types { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 12px; }
   .actions { display: flex; gap: 12px; }
   .actions button { font: inherit; font-size: 12px; color: var(--primary-color); background: none; border: 0; padding: 0; cursor: pointer; }
 `;
