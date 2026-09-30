@@ -156,7 +156,7 @@ export function buildScheduleAutomation({ id, scheduleEntityId, scheduleName, ta
   const branch = (tid, sequence) => ({ conditions: [{ condition: 'trigger', id: tid }], sequence });
   return {
     id,
-    alias: `Beit · ${scheduleName}`,
+    alias: scheduleAlias(scheduleName),
     description: `${BEIT_MARKER} — ${target.name ?? target.entityId} לפי ${scheduleEntityId}`,
     triggers: [trigger('on', 'schedule_on'), ...(off.length ? [trigger('off', 'schedule_off')] : [])],
     conditions: [],
@@ -167,6 +167,41 @@ export function buildScheduleAutomation({ id, scheduleEntityId, scheduleName, ta
 
 /** True for an automation config Beit wrote (and so may rewrite or delete). */
 export const isOurs = (config) => String(config?.description ?? '').includes(BEIT_MARKER);
+
+// Key order is HA's business; compare configs by content.
+const canonical = (v) => (Array.isArray(v) ? v.map(canonical) : v && typeof v === 'object'
+  ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canonical(v[k])])) : v);
+export const sameConfig = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+
+export const scheduleAlias = (scheduleName) => `Beit · ${scheduleName}`;
+
+/**
+ * Reads back what an automation written by buildScheduleAutomation does: `{scheduleEntityId, scheduleName, target}`.
+ * Null unless it carries the marker and is exactly in that shape (so it was not edited by hand since): the card never
+ * rewrites what it could not write again.
+ */
+export function parseScheduleAutomation(config) {
+  if (!isOurs(config)) return null;
+  const choose = config.actions?.[0]?.choose;
+  const on = choose?.[0]?.sequence;
+  const scheduleEntityId = config.triggers?.[0]?.entity_id?.[0];
+  const first = on?.[0];
+  const entityId = first?.target?.entity_id;
+  if (!scheduleEntityId || typeof entityId !== 'string' || !String(config.alias ?? '').startsWith('Beit · ')) return null;
+  const data = first.data || {};
+  const name = String(config.description).match(/ — (.*) לפי schedule\.[a-z0-9_]+$/)?.[1] ?? entityId;
+  const target = {
+    entityId,
+    name,
+    hvacMode: data.hvac_mode ?? null,
+    temperature: data.temperature ?? on[1]?.data?.temperature ?? null,
+    brightnessPct: data.brightness_pct ?? null,
+    turnOffAtEnd: (choose?.length ?? 0) > 1,
+  };
+  const scheduleName = config.alias.slice('Beit · '.length);
+  const again = buildScheduleAutomation({ id: config.id, scheduleEntityId, scheduleName, target });
+  return sameConfig(again, config) ? { scheduleEntityId, scheduleName, target } : null;
+}
 
 /** The schedule entities an automation config refers to. */
 export function schedulesIn(config) {
@@ -417,6 +452,22 @@ export async function deleteSchedule(hass, scheduleEntityId) {
   }
   await hass.callWS({ type: 'schedule/delete', schedule_id: scheduleEntityId.slice('schedule.'.length) });
   return kept;
+}
+
+/**
+ * After a schedule is renamed: the automations Beit wrote for it follow, but only those still named
+ * `Beit · <old name>`; an alias the user changed stays. Returns the entity ids that were renamed.
+ */
+export async function renameScheduleAutomations(hass, automationEntityIds, oldName, newName) {
+  const renamed = [];
+  if (oldName.trim() === newName.trim()) return renamed;
+  for (const id of automationEntityIds) {
+    const cfg = await automationConfig(hass, id);
+    if (!isOurs(cfg) || cfg.alias !== scheduleAlias(oldName.trim()) || cfg.id == null) continue;
+    await hass.callApi('POST', `config/automation/config/${cfg.id}`, { ...cfg, alias: scheduleAlias(newName.trim()) });
+    renamed.push(id);
+  }
+  return renamed;
 }
 
 export const setAutomationEnabled = (hass, automationEntityId, enabled) =>
@@ -1204,6 +1255,7 @@ class ScheduleEditor {
     this.week = entityId ? card._weeks[this.id].clone() : new WeekSchedule({ name: '' });
     this.mode = entityId ? card._modeOf(entityId) : null;
     this.originalMode = this.mode;
+    this.originalName = this.week.name;
     this.view = 'main'; // 'picker' | 'confirmDelete'
     this.device = null;
     this.hvacMode = null;
@@ -1609,6 +1661,7 @@ class ScheduleEditor {
         }, { labelName: this.mode });
       } else {
         await updateSchedule(h, this.id, this.week);
+        await renameScheduleAutomations(h, this.automations || [], this.originalName, this.week.name);
         // Only when the user changed it: the automations may carry a mode the schedule itself does not.
         if (this.mode !== this.originalMode) {
           const ids = [this.entityId, ...(this.automations || [])];

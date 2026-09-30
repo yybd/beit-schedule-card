@@ -56,6 +56,8 @@ Written with `POST /api/config/automation/config/<id>`. From a card this is `has
   2. Wait for `schedule.<id>` to appear in `hass.states`.
   3. POST the automation.
   4. If the POST fails, `schedule/delete`, so the card never leaves a helper that drives nothing.
+- **Renaming a schedule:** each related automation carrying the marker and still named `Beit · <old name>` is POSTed
+  again with `alias: "Beit · <new name>"` and nothing else changed. An alias the user changed is left alone.
 - **Finding a schedule's automations:** `search/related {item_type: "entity", item_id: "schedule.<id>"}` → `.automation[]`.
 - **Reading one automation:** `automation/config {entity_id}` → `.config`.
 - **Deleting a schedule:**

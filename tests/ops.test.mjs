@@ -258,3 +258,41 @@ test('slugify approximates HA for Hebrew names', () => {
   assert.equal(slugify('Night light'), 'night_light');
   assert.equal(slugify('מזגן סלון'), 'mzgn_slvn');
 });
+
+// ---- renaming ------------------------------------------------------------------------------------------------------
+
+import { parseScheduleAutomation, renameScheduleAutomations, buildScheduleAutomation } from '../dist/beit-schedule-card.js';
+
+test('parseScheduleAutomation reads back exactly what the builder wrote, and nothing edited by hand', () => {
+  for (const target of [
+    { entityId: 'climate.a', name: 'מזגן', hvacMode: 'heat', temperature: 23, brightnessPct: null, turnOffAtEnd: true },
+    { entityId: 'climate.a', name: 'מזגן', hvacMode: 'cool', temperature: null, brightnessPct: null, turnOffAtEnd: false },
+    { entityId: 'light.l', name: 'אור', hvacMode: null, temperature: null, brightnessPct: 40, turnOffAtEnd: true },
+    { entityId: 'water_heater.w', name: 'דוד', hvacMode: null, temperature: 60, brightnessPct: null, turnOffAtEnd: true },
+    { entityId: 'cover.c', name: 'תריס', hvacMode: null, temperature: null, brightnessPct: null, turnOffAtEnd: true },
+  ]) {
+    const cfg = buildScheduleAutomation({ id: '9', scheduleEntityId: 'schedule.s', scheduleName: 'שם', target });
+    assert.deepEqual(parseScheduleAutomation(cfg), { scheduleEntityId: 'schedule.s', scheduleName: 'שם', target }, target.entityId);
+  }
+  const cfg = buildScheduleAutomation({ id: '9', scheduleEntityId: 'schedule.s', scheduleName: 'שם', target: { entityId: 'switch.x', name: 'x' } });
+  assert.equal(parseScheduleAutomation({ ...cfg, mode: 'single' }), null, 'edited by hand');
+  assert.equal(parseScheduleAutomation({ ...cfg, description: 'mine' }), null, 'no marker');
+  // Fixture automations the card wrote parse; hand-written ones don't.
+  assert.ok(parseScheduleAutomation(fixtures.automation_configs['automation.beit_bedroom_ac_shabbat']));
+  assert.equal(parseScheduleAutomation(fixtures.automation_configs['automation.living_room_fan_shabbat']), null);
+});
+
+test('renaming a schedule renames only the Beit automations still named after it', async () => {
+  const hass = house();
+  const autos = await automationsFor(hass, 'schedule.living_room_ac_shabbat');
+  const renamed = await renameScheduleAutomations(hass, autos, 'מזגן סלון שבת', 'מזגן סלון לשבת');
+  assert.deepEqual(renamed, ['automation.beit_living_room_ac_shabbat']);
+  const post = hass.calls.find((c) => c.method === 'POST');
+  assert.equal(post.path, 'config/automation/config/1767000000001');
+  assert.equal(post.body.alias, 'Beit · מזגן סלון לשבת');
+  // Everything else is as it was.
+  assert.deepEqual({ ...post.body, alias: null }, { ...fixtures.automation_configs['automation.beit_living_room_ac_shabbat'], alias: null });
+  // The hand-written one, and a Beit one renamed by the user, stay.
+  assert.deepEqual(await renameScheduleAutomations(house(), autos, 'שם אחר', 'חדש'), []);
+  assert.deepEqual(await renameScheduleAutomations(house(), autos, 'x', 'x'), []);
+});
