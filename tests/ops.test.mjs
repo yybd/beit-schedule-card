@@ -320,3 +320,84 @@ test('rewriteScheduleAutomation changes device and action under the same id, and
   assert.equal(hass.states['automation.beit_bedroom_ac_shabbat'].state, 'off');
   await assert.rejects(rewriteScheduleAutomation(hass, fixtures.automation_configs['automation.living_room_fan_shabbat'], { target }), /by hand/);
 });
+
+// ---- automatic modes: start time and chag ------------------------------------------------------------------------
+
+import {
+  autoStartTrigger, parseAutoStart, autoAvailable, buildAutoModeAutomation, enableAuto, disableAuto, setAutoStart, findAuto,
+  findCalendar, AUTO_ALIAS, startText,
+} from '../dist/beit-schedule-card.js';
+
+const calOf = (states) => findCalendar(Object.fromEntries(states.map((s) => [s.entity_id, s])));
+
+test('the start of an automatic mode: a time of day, or hours before candle lighting', () => {
+  const cal = calOf(fixtures.states);
+  assert.deepEqual(autoStartTrigger('שבת', { at: '13:30' }, cal), { trigger: 'time', at: '13:30:00', id: 'erev_shabbat' });
+  assert.deepEqual(autoStartTrigger('שבת', { hoursBefore: 3 }, cal),
+    { trigger: 'time', at: { entity_id: 'sensor.jewish_calendar_upcoming_shabbat_candle_lighting_2', offset: '-03:00:00' }, id: 'erev_shabbat' });
+  assert.deepEqual(autoStartTrigger('חג', { hoursBefore: 1.5 }, cal).at,
+    { entity_id: 'sensor.jewish_calendar_upcoming_candle_lighting_2', offset: '-01:30:00' });
+  // Hebcal has no timestamp to count back from.
+  assert.equal(autoStartTrigger('שבת', { hoursBefore: 2 }, { hebcal: { isShabbat: 'sensor.hebcal_is_shabbat' } }), null);
+  for (const start of [{ at: '12:00' }, { at: '09:15' }, { hoursBefore: 4 }, { hoursBefore: 2.5 }]) {
+    for (const mode of ['שבת', 'חג']) {
+      assert.deepEqual(parseAutoStart(buildAutoModeAutomation({ id: '1', mode, labelId: 'l', start, cal })), start, `${mode} ${JSON.stringify(start)}`);
+    }
+  }
+  assert.equal(startText({ hoursBefore: 3 }), '3 שעות לפני הדלקת הנרות');
+  assert.equal(startText({ at: '12:00' }, 'en'), 'at 12:00');
+});
+
+test('automatic chag: on at erev chag (a Friday only when a chag joins Shabbat), off after it, Jewish Calendar only', () => {
+  const cal = calOf(fixtures.states);
+  const a = buildAutoModeAutomation({ id: '7', mode: 'חג', labelId: 'khg', cal });
+  assert.equal(a.alias, AUTO_ALIAS['חג']);
+  assert.ok(isOurs(a));
+  const [on, off] = a.actions[0].choose;
+  const tpl = on.conditions[1].value_template;
+  assert.match(tpl, /is_state\('binary_sensor\.jewish_calendar_erev_shabbat_hag_2', 'on'\)/);
+  assert.match(tpl, /now\(\)\.weekday\(\) != 4/);
+  assert.match(tpl, /> 129600/);
+  assert.deepEqual(on.sequence, [{ action: 'automation.turn_on', target: { label_id: 'khg' } }]);
+  assert.deepEqual(a.triggers[1], { trigger: 'state', entity_id: ['binary_sensor.jewish_calendar_issur_melacha_in_effect_2'], from: 'on', to: 'off', id: 'motzei_chag' });
+  assert.match(off.sequence[0].wait_template, /label_entities\('khg'\)/);
+  assert.equal(autoAvailable('חג', cal), true);
+  assert.equal(autoAvailable('חג', calOf(fixtures.states.filter((s) => !s.entity_id.includes('jewish_calendar')))), false);
+  assert.equal(autoAvailable('שבת', calOf(fixtures.states.filter((s) => !s.entity_id.includes('jewish_calendar')))), true);
+});
+
+test('enableAuto creates automatic chag once, disableAuto only disables it', async () => {
+  const hass = house();
+  const id = await enableAuto(hass, 'חג', { start: { hoursBefore: 2 }, ...FAST });
+  assert.equal(hass.states[id].attributes.friendly_name, AUTO_ALIAS['חג']);
+  assert.deepEqual(parseAutoStart((await findAuto(hass, 'חג')).config), { hoursBefore: 2 });
+  assert.equal(await disableAuto(hass, 'חג'), 'turned_off');
+  assert.equal(hass.states[id].state, 'off');
+  assert.equal(await enableAuto(hass, 'חג', FAST), id);
+  assert.equal(hass.calls.filter((c) => c.method === 'POST').length, 1);
+  const hebcalOnly = new FakeHass({ ...fixtures, states: fixtures.states.filter((s) => !s.entity_id.includes('jewish_calendar')) }, { now: SUNDAY_9AM });
+  await assert.rejects(enableAuto(hebcalOnly, 'חג', FAST), /Jewish Calendar/);
+});
+
+test('setAutoStart replaces only the start trigger, and the description while it is still ours', async () => {
+  const hass = house();
+  await enableAuto(hass, 'שבת', FAST);
+  const before = (await findAuto(hass, 'שבת')).config;
+  assert.equal(await setAutoStart(hass, 'שבת', { hoursBefore: 4 }), true);
+  const after = (await findAuto(hass, 'שבת')).config;
+  assert.deepEqual(parseAutoStart(after), { hoursBefore: 4 });
+  assert.deepEqual(after.triggers[1], before.triggers[1]);
+  assert.deepEqual(after.actions, before.actions);
+  assert.match(after.description, /4 שעות לפני הדלקת הנרות/);
+  assert.equal(await setAutoStart(hass, 'שבת', { hoursBefore: 4 }), false);
+  // An older wording is left alone, only the trigger changes.
+  const older = new FakeHass({
+    ...fixtures,
+    states: [...fixtures.states, { entity_id: 'automation.auto', state: 'on', attributes: { id: '5', friendly_name: AUTO_ALIAS['שבת'] }, last_changed: '', last_updated: '' }],
+    automation_configs: { ...fixtures.automation_configs, 'automation.auto': { ...before, id: '5', description: `${BEIT_MARKER} — older wording` } },
+  }, { now: SUNDAY_9AM });
+  await setAutoStart(older, 'שבת', { at: '13:00' });
+  const cfg = (await findAuto(older, 'שבת')).config;
+  assert.equal(cfg.description, `${BEIT_MARKER} — older wording`);
+  assert.equal(cfg.triggers[0].at, '13:00:00');
+});

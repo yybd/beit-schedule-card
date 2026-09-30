@@ -486,6 +486,21 @@
   }
  },
  {
+  "entity_id": "sensor.jewish_calendar_upcoming_shabbat_candle_lighting_2",
+  "state": "2026-01-09T14:26:00+00:00",
+  "attributes": {
+   "device_class": "timestamp",
+   "friendly_name": "Jewish Calendar Upcoming Shabbat candle lighting"
+  },
+  "last_changed": "2026-01-04T08:00:00+00:00",
+  "last_updated": "2026-01-04T08:00:00+00:00",
+  "context": {
+   "id": "01J0000000000000000000000",
+   "parent_id": null,
+   "user_id": null
+  }
+ },
+ {
   "entity_id": "sensor.jewish_calendar_upcoming_havdalah_2",
   "state": "2026-01-10T15:44:00+00:00",
   "attributes": {

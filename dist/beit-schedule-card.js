@@ -267,6 +267,7 @@ export function findCalendar(states) {
     erev: jc('binary_sensor', 'erev_shabbat_hag'),
     motzei: jc('binary_sensor', 'motzei_shabbat_hag'),
     candleLighting: jc('sensor', 'upcoming_candle_lighting'),
+    shabbatCandleLighting: jc('sensor', 'upcoming_shabbat_candle_lighting'),
     havdalah: jc('sensor', 'upcoming_havdalah'),
     date: jc('sensor', 'date'),
     parasha: jc('sensor', 'weekly_torah_portion'),
@@ -284,9 +285,20 @@ export function findCalendar(states) {
   return cal;
 }
 
-// ---------------------------------------------------------------------------- automatic Shabbat
+// ---------------------------------------------------------------------------- automatic modes
 
-export const AUTO_SHABBAT_ALIAS = 'Beit · מצב שבת אוטומטי';
+/** One automation per mode switches the mode on before it begins and off after it ends. Recognised by alias. */
+export const AUTO_ALIAS = { שבת: 'Beit · מצב שבת אוטומטי', חג: 'Beit · מצב חג אוטומטי' };
+export const AUTO_SHABBAT_ALIAS = AUTO_ALIAS['שבת'];
+export const isAutoAlias = (name) => Object.values(AUTO_ALIAS).includes(name);
+
+/** When a mode switches on: `{at: 'HH:MM'}` on the day, or `{hoursBefore: n}` before candle lighting (Jewish Calendar). */
+export const DEFAULT_AUTO_START = { at: '12:00' };
+const START_ID = { שבת: 'erev_shabbat', חג: 'erev_chag' };
+const END_ID = { שבת: 'motzei_shabbat', חג: 'motzei_chag' };
+// Longer than any Shabbat on its own (about 25-26 hours from candle lighting to havdalah), shorter than Shabbat plus a
+// day of chag (about 49): on a Friday, a longer stretch ahead means a chag is next to this Shabbat.
+const LONG_REST_SECONDS = 36 * 3600;
 
 /**
  * The trigger that marks the end of Shabbat. Jewish Calendar's "issur melacha" going off is preferred
@@ -294,37 +306,96 @@ export const AUTO_SHABBAT_ALIAS = 'Beit · מצב שבת אוטומטי';
  * through "unknown" on a restart. Null when the house has no calendar.
  */
 export function autoShabbatEndTrigger(cal) {
-  const t = (entity, from, to) => ({ trigger: 'state', entity_id: [entity], from, to, id: 'motzei_shabbat' });
+  const t = (entity, from, to) => ({ trigger: 'state', entity_id: [entity], from, to, id: END_ID['שבת'] });
   if (cal?.issur) return t(cal.issur, 'on', 'off');
   if (cal?.motzei) return t(cal.motzei, 'off', 'on');
   if (cal?.hebcal?.isShabbat) return t(cal.hebcal.isShabbat, 'True', 'False');
   return null;
 }
 
-/** The one automatic-Shabbat automation (contract §3). */
-export function buildAutoShabbatAutomation({ id, labelId, shabbatEndTrigger }) {
-  const source = String(shabbatEndTrigger.entity_id[0]).includes('hebcal') ? 'Hebcal' : 'Jewish Calendar';
+/** The end of a mode: Shabbat as above; chag needs Jewish Calendar (Hebcal's yom tov sensor is not reliable). */
+export function autoEndTrigger(mode, cal) {
+  if (mode === 'שבת') return autoShabbatEndTrigger(cal);
+  return cal?.issur ? { trigger: 'state', entity_id: [cal.issur], from: 'on', to: 'off', id: END_ID['חג'] } : null;
+}
+
+/** Whether this house can run the automatic mode at all. */
+export function autoAvailable(mode, cal) {
+  if (mode === 'שבת') return !!autoShabbatEndTrigger(cal);
+  return !!(cal?.issur && cal?.erev && cal?.candleLighting && cal?.havdalah);
+}
+
+const pad2 = (n) => String(n).padStart(2, '0');
+
+/** The trigger that switches a mode on; null when the start needs a sensor this house lacks. */
+export function autoStartTrigger(mode, start, cal) {
+  const id = START_ID[mode];
+  if (start?.hoursBefore != null) {
+    const sensor = mode === 'שבת' ? cal?.shabbatCandleLighting || cal?.candleLighting : cal?.candleLighting;
+    if (!sensor) return null;
+    const minutes = Math.round(Number(start.hoursBefore) * 60);
+    return { trigger: 'time', at: { entity_id: sensor, offset: `-${pad2(Math.floor(minutes / 60))}:${pad2(minutes % 60)}:00` }, id };
+  }
+  const at = parseTimeInput(start?.at ?? DEFAULT_AUTO_START.at);
+  return { trigger: 'time', at: `${hm(at ?? 720)}:00`, id };
+}
+
+/** Reads the start back from an automatic-mode config: `{at}` or `{hoursBefore}`; null when it has another shape. */
+export function parseAutoStart(config) {
+  const tr = (config?.triggers || []).find((x) => Object.values(START_ID).includes(x?.id));
+  if (!tr) return null;
+  if (typeof tr.at === 'string') return { at: tr.at.slice(0, 5) };
+  const off = String(tr.at?.offset ?? '').match(/^-(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  return off ? { hoursBefore: Number(off[1]) + Number(off[2]) / 60 } : null;
+}
+
+/** "at 12:00" / "3 hours before candle lighting", as the description and the card say it. */
+export function startText(start, lang = 'he') {
+  if (start?.hoursBefore != null) {
+    const n = Number(start.hoursBefore);
+    return lang === 'he' ? (n === 1 ? 'שעה לפני הדלקת הנרות' : `${n} שעות לפני הדלקת הנרות`) : `${n} hour${n === 1 ? '' : 's'} before candle lighting`;
+  }
+  return lang === 'he' ? `ב-${start?.at ?? DEFAULT_AUTO_START.at}` : `at ${start?.at ?? DEFAULT_AUTO_START.at}`;
+}
+
+/** On a Friday, only when Shabbat is joined by a chag; any other erev (Jewish Calendar's sensor) is erev chag. */
+function erevChagTemplate(cal) {
+  return `{% set cl = as_datetime(states('${cal.candleLighting}'), none) %}{% set hv = as_datetime(states('${cal.havdalah}'), none) %}` +
+    `{{ is_state('${cal.erev}', 'on') and (now().weekday() != 4 or (cl is not none and hv is not none and (hv - cl).total_seconds() > ${LONG_REST_SECONDS})) }}`;
+}
+
+function autoDescription(mode, start, endTrigger) {
+  const source = String(endTrigger.entity_id[0]).includes('hebcal') ? 'Hebcal' : 'Jewish Calendar';
+  return mode === 'שבת'
+    ? `${BEIT_MARKER} — מדליק את כל האוטומציות עם התווית "שבת" בשישי ${startText(start)} (לפני התזמונים של אחר הצהריים), ` +
+      `ומכבה אותן ביציאת השבת לפי ${source}, אחרי שכל תזמוני השבת הסתיימו.`
+    : `${BEIT_MARKER} — מדליק את כל האוטומציות עם התווית "חג" בערב חג ${startText(start)}, ` +
+      `ומכבה אותן בצאת החג לפי Jewish Calendar, אחרי שכל תזמוני החג הסתיימו. חג שחל בשבת מכוסה במצב שבת.`;
+}
+
+/** The one automatic automation of a mode (contract §3). */
+export function buildAutoModeAutomation({ id, mode, labelId, start = DEFAULT_AUTO_START, cal, startTrigger, endTrigger }) {
+  const on = startTrigger ?? autoStartTrigger(mode, start, cal);
+  const off = endTrigger ?? autoEndTrigger(mode, cal);
   const target = { label_id: labelId };
+  const onConditions = mode === 'שבת'
+    ? [{ condition: 'time', weekday: ['fri'] }]
+    : [{ condition: 'template', value_template: erevChagTemplate(cal) }];
   return {
     id,
-    alias: AUTO_SHABBAT_ALIAS,
-    description:
-      `${BEIT_MARKER} — מדליק את כל האוטומציות עם התווית "שבת" בשישי ב-12:00 (לפני התזמונים של אחר הצהריים), ` +
-      `ומכבה אותן ביציאת השבת לפי ${source}, אחרי שכל תזמוני השבת הסתיימו.`,
-    triggers: [{ trigger: 'time', at: '12:00:00', id: 'erev_shabbat' }, shabbatEndTrigger],
+    alias: AUTO_ALIAS[mode],
+    description: autoDescription(mode, start, off),
+    triggers: [on, off],
     conditions: [],
     actions: [
       {
         choose: [
           {
-            conditions: [
-              { condition: 'trigger', id: 'erev_shabbat' },
-              { condition: 'time', weekday: ['fri'] },
-            ],
+            conditions: [{ condition: 'trigger', id: on.id }, ...onConditions],
             sequence: [{ action: 'automation.turn_on', target }],
           },
           {
-            conditions: [{ condition: 'trigger', id: 'motzei_shabbat' }],
+            conditions: [{ condition: 'trigger', id: off.id }],
             sequence: [
               {
                 wait_template: `{{ label_entities('${labelId}') | select('match', 'schedule\\\\.') | select('is_state', 'on') | list | count == 0 }}`,
@@ -339,6 +410,11 @@ export function buildAutoShabbatAutomation({ id, labelId, shabbatEndTrigger }) {
     ],
     mode: 'single',
   };
+}
+
+/** The automatic-Shabbat automation with the default start (kept for callers of 1.0). */
+export function buildAutoShabbatAutomation({ id, labelId, shabbatEndTrigger, start = DEFAULT_AUTO_START, cal = {} }) {
+  return buildAutoModeAutomation({ id, mode: 'שבת', labelId, start, cal, endTrigger: shabbatEndTrigger, startTrigger: autoStartTrigger('שבת', start, cal) });
 }
 
 // ---------------------------------------------------------------------------- time
@@ -562,15 +638,15 @@ export async function setModeEnabled(hass, registry, labelName, enabled) {
   await hass.callService('automation', enabled ? 'turn_on' : 'turn_off', {}, { entity_id: members.map((m) => m.entity_id) });
 }
 
-// ---- automatic Shabbat ----
+// ---- automatic modes ----
 
 /**
- * The existing automatic-Shabbat automation, if any: `{entityId, config, ours}`. Recognised by its alias; one that
+ * The existing automatic automation of a mode, if any: `{entityId, config, ours}`. Recognised by its alias; one that
  * carries the marker is preferred.
  */
-export async function findAutoShabbat(hass) {
+export async function findAuto(hass, mode) {
   const candidates = Object.values(hass.states || {}).filter(
-    (e) => e.entity_id.startsWith('automation.') && e.attributes?.friendly_name === AUTO_SHABBAT_ALIAS,
+    (e) => e.entity_id.startsWith('automation.') && e.attributes?.friendly_name === AUTO_ALIAS[mode],
   );
   let fallback = null;
   for (const c of candidates) {
@@ -582,32 +658,58 @@ export async function findAutoShabbat(hass) {
   return fallback;
 }
 
-/** Turns automatic Shabbat on: switches an existing one on, or creates the one automation. Never a second one. */
-export async function enableAutoShabbat(hass, { waitOptions } = {}) {
-  const existing = await findAutoShabbat(hass);
+/** Turns an automatic mode on: switches an existing one on, or creates the one automation. Never a second one. */
+export async function enableAuto(hass, mode, { start = DEFAULT_AUTO_START, waitOptions } = {}) {
+  const existing = await findAuto(hass, mode);
   if (existing) {
     if (hass.states?.[existing.entityId]?.state !== 'on') await setAutomationEnabled(hass, existing.entityId, true);
     return existing.entityId;
   }
-  const trigger = autoShabbatEndTrigger(findCalendar(hass.states));
-  if (!trigger) throw new Error(STRINGS.he.errNoCalendar);
-  const label = await ensureLabel(hass, 'שבת');
+  const cal = findCalendar(hass.states);
+  if (!autoAvailable(mode, cal)) throw new Error(mode === 'שבת' ? STRINGS.he.errNoCalendar : STRINGS.he.errNoJewishCalendar);
+  if (!autoStartTrigger(mode, start, cal)) throw new Error(STRINGS.he.errNoCandleSensor);
+  const label = await ensureLabel(hass, mode);
   const id = String(Date.now());
-  await hass.callApi('POST', `config/automation/config/${id}`, buildAutoShabbatAutomation({ id, labelId: label.label_id, shabbatEndTrigger: trigger }));
+  await hass.callApi('POST', `config/automation/config/${id}`, buildAutoModeAutomation({ id, mode, labelId: label.label_id, start, cal }));
   const entity = await waitForEntity(hass, (e) => e.entity_id.startsWith('automation.') && String(e.attributes?.id) === id, waitOptions);
   return entity.entity_id;
 }
 
 /**
- * Turns automatic Shabbat off by disabling its automation. It is never deleted: whatever the user changed in it
+ * Turns an automatic mode off by disabling its automation. It is never deleted: whatever the user changed in it
  * survives, and switching on again enables the same one.
  */
-export async function disableAutoShabbat(hass) {
-  const existing = await findAutoShabbat(hass);
+export async function disableAuto(hass, mode) {
+  const existing = await findAuto(hass, mode);
   if (!existing) return null;
   await setAutomationEnabled(hass, existing.entityId, false);
   return 'turned_off';
 }
+
+/**
+ * Changes when an automatic mode switches on. Only its start trigger is replaced (and the description, if it is still
+ * the one Beit wrote); everything else in the automation stays as it is. Only for one carrying the marker.
+ */
+export async function setAutoStart(hass, mode, start) {
+  const existing = await findAuto(hass, mode);
+  if (!existing?.ours || existing.config?.id == null) throw new Error(STRINGS.he.autoShabbatNotOurs);
+  const cfg = existing.config;
+  const trigger = autoStartTrigger(mode, start, findCalendar(hass.states));
+  if (!trigger) throw new Error(STRINGS.he.errNoCandleSensor);
+  const index = (cfg.triggers || []).findIndex((x) => x?.id === START_ID[mode]);
+  if (index < 0) throw new Error(STRINGS.he.autoShabbatNotOurs);
+  const old = parseAutoStart(cfg);
+  const end = cfg.triggers.find((x) => x?.id === END_ID[mode]);
+  const next = { ...cfg, triggers: cfg.triggers.map((x, i) => (i === index ? trigger : x)) };
+  if (end && old && cfg.description === autoDescription(mode, old, end)) next.description = autoDescription(mode, start, end);
+  if (sameConfig(next, cfg)) return false;
+  await hass.callApi('POST', `config/automation/config/${cfg.id}`, next);
+  return true;
+}
+
+export const findAutoShabbat = (hass) => findAuto(hass, 'שבת');
+export const enableAutoShabbat = (hass, options) => enableAuto(hass, 'שבת', options);
+export const disableAutoShabbat = (hass) => disableAuto(hass, 'שבת');
 
 export const entityName = (st) => st?.attributes?.friendly_name || st?.entity_id || '';
 
@@ -671,6 +773,8 @@ export const STRINGS = {
     errReversed: (day) => `ביום ${day}: שעת הסיום לפני שעת ההתחלה`,
     errOverlap: (day) => `ביום ${day}: יש טווחים חופפים`,
     errNoCalendar: 'לא נמצא לוח שנה עברי (Jewish Calendar או Hebcal) — אין לפי מה לדעת מתי השבת יוצאת',
+    errNoJewishCalendar: 'חג אוטומטי צריך את אינטגרציית Jewish Calendar (של Home Assistant) — Hebcal לא אמין לחגים',
+    errNoCandleSensor: 'לזמן יחסי להדלקת נרות צריך את אינטגרציית Jewish Calendar',
     schedules: 'תזמונים',
     newSchedule: 'תזמון חדש',
     onNow: 'פועל עכשיו',
@@ -750,16 +854,23 @@ export const STRINGS = {
     searchAutomation: 'חיפוש אוטומציה',
     noAutomations: 'לא נמצאו אוטומציות',
     autoShabbat: 'שבת אוטומטית',
-    autoShabbatHint: 'מדליק את מצב השבת בשישי ב-12:00, ומכבה אחרי צאת השבת כשכל תזמוני השבת הסתיימו.',
+    autoTitle: { שבת: 'שבת אוטומטית', חג: 'חג אוטומטי' },
+    autoHint: (mode, start) => (mode === 'שבת'
+      ? `מדליק את מצב השבת בשישי ${start}, ומכבה אחרי צאת השבת כשכל תזמוני השבת הסתיימו.`
+      : `מדליק את מצב החג בערב חג ${start}, ומכבה אחרי צאת החג כשכל תזמוני החג הסתיימו. חג שחל בשבת מכוסה במצב שבת.`),
+    startLabel: 'התחלה',
+    change: 'שינוי',
+    startAtLabel: 'בשעה',
+    hoursBeforeLabel: 'שעות לפני הדלקת הנרות',
+    errHours: 'מספר שעות בין חצי שעה ל-12',
     autoShabbatNotOurs: 'אוטומציה בשם הזה נכתבה ידנית — הכרטיס רק מדליק ומכבה אותה.',
-    autoChagHint: 'מצב חג אוטומטי עוד לא זמין. אינטגרציית Jewish Calendar מאפשרת אותו בעתיד.',
     calToday: 'היום',
     calParasha: 'פרשה',
     calHoliday: 'חג',
     calCandles: 'הדלקת נרות',
     calHavdalah: 'הבדלה',
     calInEffect: 'שבת / חג עכשיו',
-    selfExcluded: 'אוטומציית השבת האוטומטית לא יכולה להיות חלק מהמצב — היא הייתה מכבה את עצמה.',
+    selfExcluded: 'האוטומציות של שבת וחג אוטומטיים לא יכולות להיות חלק ממצב — הן היו מכבות את עצמן.',
     edGeneral: 'כללי',
     edTitle: 'כותרת',
     edShowAdd: 'כפתור "תזמון חדש"',
@@ -782,6 +893,8 @@ export const STRINGS = {
     errReversed: (day) => `${day}: a range ends before it starts`,
     errOverlap: (day) => `${day}: ranges overlap`,
     errNoCalendar: 'No Jewish calendar found (Jewish Calendar or Hebcal), so there is no way to tell when Shabbat ends',
+    errNoJewishCalendar: "Automatic chag needs Home Assistant's Jewish Calendar integration; Hebcal is not reliable for chagim",
+    errNoCandleSensor: 'A start relative to candle lighting needs the Jewish Calendar integration',
     schedules: 'Schedules',
     newSchedule: 'New schedule',
     onNow: 'On now',
@@ -861,16 +974,23 @@ export const STRINGS = {
     searchAutomation: 'Search automations',
     noAutomations: 'No automations found',
     autoShabbat: 'Automatic Shabbat',
-    autoShabbatHint: 'Turns Shabbat mode on on Friday at 12:00, and off after Shabbat ends once every Shabbat schedule has finished.',
+    autoTitle: { שבת: 'Automatic Shabbat', חג: 'Automatic chag' },
+    autoHint: (mode, start) => (mode === 'שבת'
+      ? `Turns Shabbat mode on on Friday ${start}, and off after Shabbat ends once every Shabbat schedule has finished.`
+      : `Turns chag mode on on erev chag ${start}, and off after the chag ends once every chag schedule has finished. A chag on Shabbat is covered by Shabbat mode.`),
+    startLabel: 'Starts',
+    change: 'Change',
+    startAtLabel: 'At',
+    hoursBeforeLabel: 'hours before candle lighting',
+    errHours: 'A number of hours from 0.5 to 12',
     autoShabbatNotOurs: 'An automation with this name was written by hand; the card only switches it on and off.',
-    autoChagHint: 'Automatic chag mode is not available yet. The Jewish Calendar integration makes it possible later.',
     calToday: 'Today',
     calParasha: 'Parasha',
     calHoliday: 'Holiday',
     calCandles: 'Candle lighting',
     calHavdalah: 'Havdalah',
     calInEffect: 'Shabbat / chag now',
-    selfExcluded: 'The automatic-Shabbat automation cannot be part of the mode: it would switch itself off.',
+    selfExcluded: 'The automatic Shabbat and chag automations cannot be part of a mode: they would switch themselves off.',
     edGeneral: 'General',
     edTitle: 'Title',
     edShowAdd: '"New schedule" button',
@@ -1971,20 +2091,17 @@ class BeitShabbatCard extends BeitCardBase {
     return Object.keys(this._hass?.states || {}).filter((id) => id.startsWith('automation.')).join('|');
   }
 
-  /** Finds the automatic-Shabbat automation. Its config is admin-only; others see it by alias alone. */
+  /** Finds each mode's automatic automation. Its config is admin-only; others see it by alias alone. */
   async _loadAuto() {
     this._autoSig = this._automationIds();
-    if (!this._config.modes.includes('שבת')) return;
-    if (!this._isAdmin) {
-      const hit = Object.values(this._hass.states).find((e) => e.entity_id.startsWith('automation.') && e.attributes?.friendly_name === AUTO_SHABBAT_ALIAS);
-      this._auto = hit ? { entityId: hit.entity_id, ours: true } : null;
-    } else {
-      try {
-        this._auto = await findAutoShabbat(this._h);
-      } catch {
-        this._auto = null;
-      }
+    const auto = {};
+    for (const mode of this._config.modes.filter((m) => MODES.includes(m))) {
+      if (!this._isAdmin) {
+        const hit = Object.values(this._hass.states).find((e) => e.entity_id.startsWith('automation.') && e.attributes?.friendly_name === AUTO_ALIAS[mode]);
+        auto[mode] = hit ? { entityId: hit.entity_id, ours: true, config: null } : null;
+      } else auto[mode] = await findAuto(this._h, mode).catch(() => null);
     }
+    this._auto = auto;
     this._autoLoaded = true;
     this._render(true);
   }
@@ -1996,13 +2113,14 @@ class BeitShabbatCard extends BeitCardBase {
     const cal = findCalendar(states);
     const modes = this._config.modes.filter((m) => MODES.includes(m));
     const members = Object.fromEntries(modes.map((m) => [m, {
-      automations: modeMembers(states, reg, m).filter((e) => e.attributes?.friendly_name !== AUTO_SHABBAT_ALIAS),
+      automations: modeMembers(states, reg, m).filter((e) => !isAutoAlias(e.attributes?.friendly_name)),
       schedules: modeMembers(states, reg, m, 'schedule'),
     }]));
     const calIds = [cal.issur, cal.candleLighting, cal.havdalah, cal.date, cal.parasha, cal.holiday, ...Object.values(cal.hebcal)].filter(Boolean);
     const sig = JSON.stringify([
       this._lang, this._isAdmin, this._config, new Date().toDateString(), new Date().getHours(), this._busy,
-      calIds.map((id) => states[id]?.state), this._labels?.length, this._auto, this._auto && states[this._auto.entityId]?.state,
+      calIds.map((id) => states[id]?.state), this._labels?.length, this._auto, this._startEdit, this._start,
+      Object.values(this._auto || {}).map((a) => a && states[a.entityId]?.state),
       modes.map((m) => [members[m].automations.map((e) => [e.entity_id, e.state]), members[m].schedules.map((e) => [e.entity_id, e.last_updated])]),
     ]);
     if (!force && sig === this._sig) return;
@@ -2012,13 +2130,22 @@ class BeitShabbatCard extends BeitCardBase {
       root.innerHTML = `<style>${BASE_STYLE}${SHABBAT_STYLE}${EDITOR_STYLE}</style><ha-card><div class="body"></div></ha-card><div class="toast" hidden role="status"></div>`;
       root.addEventListener('click', (e) => this._onClick(e));
       root.addEventListener('change', (e) => this._onChange(e));
+      root.addEventListener('input', (e) => {
+        const f = e.target.dataset?.startField;
+        if (f && this._startEdit) this._startEdit[f] = e.target.value; // kept across redraws while typing
+      });
+      root.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.target.dataset?.startField) root.querySelector('[data-act=startSave]')?.click();
+      });
     }
     const t = this._t;
+    const focusId = root.activeElement?.id;
     this._paint(
       this._config.title !== '' ? `<div class="header"><h2>${esc(this._config.title ?? t.shabbatAndChag)}</h2></div>` : '',
       `${this._config.show_calendar !== false ? this._calendarHtml(states, cal) : ''}
       ${modes.map((m) => this._modeHtml(m, members[m], cal)).join('')}`,
     );
+    if (focusId) root.getElementById?.(focusId)?.focus();
   }
 
   _calendarHtml(states, cal) {
@@ -2053,30 +2180,108 @@ class BeitShabbatCard extends BeitCardBase {
         return `<div class="sched"><span class="dot ${on ? 'on' : ''}"></span><span class="grow">${esc(entityName(s))}</span>
           ${next && !isNaN(next) ? `<span class="muted small">${esc(`${on ? t.ends : t.starts} ${formatWhen(next, now, this._lang)}`)}</span>` : ''}</div>`;
       }).join('')}</div>` : ''}
-      ${mode === 'שבת' ? this._autoHtml(cal) : `<div class="muted small hint-line">${esc(t.autoChagHint)}</div>`}
+      ${this._autoHtml(mode, cal)}
       ${this._isAdmin ? `<div class="mode-foot"><button class="btn" data-act="members" data-mode="${esc(mode)}">${icon('checklist')}<span>${esc(t.chooseAutomations)}</span></button></div>` : ''}
     </section>`;
   }
 
-  _autoHtml(cal) {
+  /** The start of a mode: what its automation says, or what will be used when it is created. */
+  _currentStart(mode) {
+    const auto = this._auto?.[mode];
+    return (auto?.config && parseAutoStart(auto.config)) || this._start?.[mode] || DEFAULT_AUTO_START;
+  }
+
+  _autoHtml(mode, cal) {
     const t = this._t;
-    const auto = this._auto;
+    const auto = this._auto?.[mode];
     const on = !!auto && this._hass.states[auto.entityId]?.state === 'on';
-    const noCalendar = !auto && !autoShabbatEndTrigger(cal);
-    const disabled = !this._isAdmin || !this._autoLoaded || this._busy === 'auto' || noCalendar;
+    const unavailable = !auto && !autoAvailable(mode, cal);
+    const disabled = !this._isAdmin || !this._autoLoaded || this._busy === `auto-${mode}` || unavailable;
+    const start = this._currentStart(mode);
+    const canEditStart = this._isAdmin && this._autoLoaded && !unavailable && (!auto || (auto.ours && parseAutoStart(auto.config)));
+    const hint = unavailable ? (mode === 'שבת' ? t.errNoCalendar : t.errNoJewishCalendar)
+      : auto && !auto.ours ? t.autoShabbatNotOurs : t.autoHint(mode, startText(start, this._lang));
     return `<div class="auto">
-      <div class="grow"><div>${esc(t.autoShabbat)}</div>
-        <div class="muted small">${esc(noCalendar ? t.errNoCalendar : auto && !auto.ours ? t.autoShabbatNotOurs : t.autoShabbatHint)}</div></div>
-      ${switchHtml({ checked: on, disabled, label: t.autoShabbat, attrs: 'data-autoshabbat="1"' })}
+      <div class="grow"><div>${esc(t.autoTitle[mode])}</div>
+        <div class="muted small">${esc(hint)}</div>
+        ${canEditStart && this._startEdit?.mode !== mode ? `<div class="small start-line">${esc(t.startLabel)}: ${esc(startText(start, this._lang))} ·
+          <button class="link" data-act="startEdit" data-mode="${esc(mode)}">${esc(t.change)}</button></div>` : ''}</div>
+      ${switchHtml({ checked: on, disabled, label: t.autoTitle[mode], attrs: `data-automode="${esc(mode)}"` })}
+    </div>
+    ${this._startEdit?.mode === mode ? this._startPanelHtml(mode, cal) : ''}`;
+  }
+
+  _startPanelHtml(mode, cal) {
+    const t = this._t;
+    const e = this._startEdit;
+    const relative = !!autoStartTrigger(mode, { hoursBefore: 1 }, cal);
+    return `<div class="panel start-panel" role="group" aria-label="${esc(t.startLabel)}">
+      <label class="check"><input type="radio" name="start-${esc(mode)}" value="at" data-start-kind ${e.kind === 'at' ? 'checked' : ''}>
+        <span>${esc(t.startAtLabel)}</span>
+        <input type="text" id="start-at" data-start-field="at" inputmode="numeric" maxlength="5" placeholder="HH:MM" value="${esc(e.at)}" dir="ltr"></label>
+      <label class="check ${relative ? '' : 'off'}"><input type="radio" name="start-${esc(mode)}" value="hoursBefore" data-start-kind
+        ${e.kind === 'hoursBefore' ? 'checked' : ''} ${relative ? '' : 'disabled'}>
+        <input type="text" id="start-hb" data-start-field="hoursBefore" inputmode="decimal" maxlength="4" value="${esc(e.hoursBefore)}" dir="ltr" ${relative ? '' : 'disabled'}>
+        <span>${esc(t.hoursBeforeLabel)}</span></label>
+      ${relative ? '' : `<div class="muted small">${esc(t.errNoCandleSensor)}</div>`}
+      ${e.error ? `<div class="error small" role="alert">${esc(e.error)}</div>` : ''}
+      <div class="actions"><button class="btn" data-act="startCancel">${esc(t.cancel)}</button>
+        <button class="btn primary" data-act="startSave" data-mode="${esc(mode)}" ${this._busy ? 'disabled' : ''}>${esc(t.save)}</button></div>
     </div>`;
+  }
+
+  async _saveStart(mode) {
+    const t = this._t;
+    const e = this._startEdit;
+    let start;
+    if (e.kind === 'hoursBefore') {
+      const n = Number(String(e.hoursBefore).replace(',', '.'));
+      if (!(n >= 0.5 && n <= 12)) return this._startError(t.errHours);
+      start = { hoursBefore: Math.round(n * 2) / 2 };
+    } else {
+      const at = parseTimeInput(e.at);
+      if (at == null || at >= 1440) return this._startError(t.errTime);
+      start = { at: hm(at) };
+    }
+    const auto = this._auto?.[mode];
+    if (!auto) {
+      this._start = { ...this._start, [mode]: start }; // used when the automation is created
+      this._startEdit = null;
+      return this._render(true);
+    }
+    this._busy = `auto-${mode}`;
+    this._render(true);
+    const ok = await this._run(async () => { await setAutoStart(this._h, mode, start); return true; });
+    this._busy = null;
+    if (ok) this._startEdit = null;
+    await this._loadAuto();
+  }
+
+  _startError(message) {
+    this._startEdit.error = message;
+    this._render(true);
   }
 
   _onClick(e) {
     const el = e.target.closest?.('[data-act]');
-    if (el?.dataset.act === 'members' && !this._members) {
+    const act = el?.dataset.act;
+    if (act === 'members' && !this._members) {
       this._members = new MembershipDialog(this, el.dataset.mode);
       this._members.open();
-    }
+    } else if (act === 'startEdit') {
+      const start = this._currentStart(el.dataset.mode);
+      this._startEdit = {
+        mode: el.dataset.mode,
+        kind: start.hoursBefore != null ? 'hoursBefore' : 'at',
+        at: start.at ?? DEFAULT_AUTO_START.at,
+        hoursBefore: String(start.hoursBefore ?? 3),
+      };
+      this._render(true);
+      this._root().getElementById?.(this._startEdit.kind === 'at' ? 'start-at' : 'start-hb')?.focus();
+    } else if (act === 'startCancel') {
+      this._startEdit = null;
+      this._render(true);
+    } else if (act === 'startSave') this._saveStart(el.dataset.mode);
   }
 
   async _onChange(e) {
@@ -2091,13 +2296,18 @@ class BeitShabbatCard extends BeitCardBase {
     } else if (d.auto) {
       await this._run(() => setAutomationEnabled(this._h, d.auto, on));
       this._render(true);
-    } else if (d.autoshabbat) {
-      this._busy = 'auto';
+    } else if (d.automode) {
+      const mode = d.automode;
+      this._busy = `auto-${mode}`;
       this._render(true);
-      await this._run(() => (on ? enableAutoShabbat(this._h) : disableAutoShabbat(this._h)));
+      await this._run(() => (on ? enableAuto(this._h, mode, { start: this._currentStart(mode) }) : disableAuto(this._h, mode)));
       this._busy = null;
       await this._loadAuto();
       this._loadLabels();
+    } else if (d.startKind !== undefined && this._startEdit) {
+      this._startEdit.kind = e.target.value;
+      this._startEdit.error = null;
+      this._render(true);
     }
   }
 }
@@ -2152,7 +2362,7 @@ class MembershipDialog {
     const members = new Set(modeMembers(states, reg, this.mode).map((e) => e.entity_id));
     const q = this.query.trim().toLowerCase();
     const autos = Object.values(states)
-      .filter((e) => e.entity_id.startsWith('automation.') && e.attributes?.friendly_name !== AUTO_SHABBAT_ALIAS)
+      .filter((e) => e.entity_id.startsWith('automation.') && !isAutoAlias(e.attributes?.friendly_name))
       .filter((e) => !q || entityName(e).toLowerCase().includes(q) || e.entity_id.includes(q))
       .sort((a, b) => entityName(a).localeCompare(entityName(b), this.card._lang));
     const list = this.dlg.querySelector('.checklist');
@@ -2201,7 +2411,12 @@ const SHABBAT_STYLE = `
   .sched { display: flex; align-items: center; gap: 8px; min-height: 26px; font-size: 14px; }
   .sched .grow { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .auto { margin-top: 8px; padding: 8px 10px 8px 12px; border-radius: 10px; background: var(--secondary-background-color, rgba(127,127,127,.08)); }
-  .hint-line { margin-top: 8px; padding-inline-start: 42px; }
+  .start-line { margin-top: 4px; color: var(--secondary-text-color); }
+  .start-panel { margin: 8px 0 0; }
+  .start-panel .check { flex-wrap: wrap; }
+  .start-panel .check.off { opacity: .5; }
+  .start-panel input[type=text] { font: inherit; width: 5.5em; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--divider-color);
+    background: var(--card-background-color); color: var(--primary-text-color); text-align: center; font-variant-numeric: tabular-nums; }
   .mode-foot { display: flex; justify-content: flex-end; margin-top: 8px; }
   .checklist { display: flex; flex-direction: column; }
   .check-row { display: flex; align-items: center; gap: 12px; padding: 8px 4px; border-bottom: 1px solid var(--divider-color); cursor: pointer; }

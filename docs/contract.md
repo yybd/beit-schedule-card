@@ -79,9 +79,21 @@ Written with `POST /api/config/automation/config/<id>`. From a card this is `has
   - "off" when none are.
 - **Automatic Shabbat.** One automation, alias `Beit · מצב שבת אוטומטי`, carrying the marker:
   - Fridays at 12:00 it turns the label on. That is before typical Friday-afternoon schedules; candle lighting is too late.
+    The start trigger (`id: erev_shabbat`) may instead be a time of day `HH:MM:00`, or
+    `{at: {entity_id: sensor.jewish_calendar_upcoming_shabbat_candle_lighting*, offset: "-HH:MM:00"}}`; the
+    `weekday: [fri]` condition stays. Changing the start replaces only that trigger (and the description while it is
+    still the one Beit wrote).
   - When Shabbat ends (see §4), it waits until every `schedule.*` carrying the label is off (6 h timeout), then turns the label off with `stop_actions: false`.
   - The card creates it on request, and **recognises** an existing one by the marker and the alias, so there is never a second.
   - Switching it off **disables** it (`automation.turn_off`). The card never deletes it, so changes the user made to it survive.
+- **Automatic chag.** The same shape with alias `Beit · מצב חג אוטומטי` and the `חג` label. Jewish Calendar only.
+  - Start trigger `id: erev_chag`: a time of day, or an offset before `sensor.jewish_calendar_upcoming_candle_lighting*`.
+    Condition, a template: the `erev_shabbat_hag*` sensor is on, and the day is not Friday unless the stretch from
+    upcoming candle lighting to upcoming havdalah is longer than 36 h (Shabbat joined by a chag).
+  - End trigger `id: motzei_chag`: `issur_melacha_in_effect*` from `on` to `off`, then the same wait and turn-off as Shabbat.
+  - A chag that falls on Shabbat alone is covered by Shabbat mode.
+  - Neither automatic automation is ever a member of a mode: it would switch itself off.
+  - The Beit app does not create automatic chag yet; it sees it as an ordinary automation carrying the marker.
 
 ## 4. Calendar sources
 

@@ -42,8 +42,9 @@
   created, you can also change the device and what it does; renaming a schedule renames its automation too.
 - **Shabbat and chag modes.** A single switch turns on or off every automation that belongs to a mode, and the card
   shows whether the mode is fully on, partly on or off.
-- **Automatic Shabbat mode.** Switches on before Friday's schedules begin and off after Shabbat ends. It turns off only
-  once every Shabbat schedule has finished, so no device is left running.
+- **Automatic Shabbat and chag.** Switches the mode on before its schedules begin (at a time you choose, or some hours
+  before candle lighting) and off after it ends, only once every schedule of the mode has finished, so no device is
+  left running.
 - **Jewish calendar on the card.** Candle lighting, havdalah, the parasha and today's holiday, from the core
   [Jewish Calendar](https://www.home-assistant.io/integrations/jewish_calendar/) integration (or Hebcal, if installed).
 - **Hebrew first.** Full right-to-left layout and a week that starts on Sunday. English is also supported.
@@ -179,9 +180,15 @@ A mode is a Home Assistant **label**, named `שבת` or `חג`.
   device, and the Home Assistant UI itself, sees the same list.
 - **The mode switch.** It turns every member automation on or off together. The per-automation switches below it stay
   available.
-- **Automatic Shabbat mode** (optional, one switch on the card). Creates one automation that:
-  1. turns the Shabbat mode on every **Friday at 12:00**, before typical Friday-afternoon schedules begin;
+- **Automatic Shabbat** (optional, one switch on the card). Creates one automation that:
+  1. turns the Shabbat mode on every **Friday at 12:00**, before typical Friday-afternoon schedules begin. You can pick
+     another time, or a number of hours before candle lighting (with Jewish Calendar);
   2. turns it off **after Shabbat ends**, but only once every Shabbat schedule has finished.
+- **Automatic chag** (optional, needs the core Jewish Calendar integration). The same for chag mode: on erev chag at
+  the time you choose, off after the chag ends. A chag that falls on Shabbat is covered by Shabbat mode, since nothing
+  in the calendar says so a day ahead.
+- **Switching an automatic mode off** disables its automation. It is never deleted, so changes you made to it in Home
+  Assistant survive.
 
 ## How it works
 
