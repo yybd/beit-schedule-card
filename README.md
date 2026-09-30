@@ -199,7 +199,7 @@ Yes. It is a regular dashboard card, so it works wherever your dashboards do.
 
 Issues and pull requests are welcome.
 
-- Run the tests with `node --test tests/`.
+- Run the tests with `node --test 'tests/*.test.mjs'`.
 - Preview the card without Home Assistant with `python3 dev/serve.py`.
 
 ## License

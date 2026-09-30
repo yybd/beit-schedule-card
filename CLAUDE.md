@@ -20,6 +20,6 @@ A Home Assistant dashboard plugin (HACS, category *Dashboard*): `dist/beit-sched
 ## Commands
 
 ```bash
-node --test tests/          # unit + fake-hass tests
+node --test 'tests/*.test.mjs'          # unit + fake-hass tests
 python3 dev/serve.py        # preview at http://localhost:8766 (offline fake hass; ?live=1 for a real HA)
 ```

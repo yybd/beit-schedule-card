@@ -14,7 +14,7 @@ reference implementation (listed at the top of the contract). Where the app and 
 - **Frontend only.** The card uses `hass.callWS`, `hass.callApi` and `hass.callService`. No Python integration.
 - **One file, two cards.** Pure logic sits at the top of the file and is exported. Custom-element registration is
   guarded by `typeof customElements !== 'undefined'`, so that `node --test` can import the file.
-- **Tests use Node's built-in runner** (`node --test tests/`), with no test dependencies.
+- **Tests use Node's built-in runner** (`node --test 'tests/*.test.mjs'`), with no test dependencies.
 - **Do not use Home Assistant's internal elements** (`ha-entity-picker`, `ha-dialog`…). They are lazy-loaded and
   change between releases. Build our own small controls from HA theme CSS variables. `ha-card` is fine.
 - **Styling.** Use HA CSS variables (`--primary-color`, `--card-background-color`, `--primary-text-color`,
@@ -116,7 +116,7 @@ Each phase ends with passing tests and **one commit**.
 - Mobile layout, dark and light themes, keyboard focus, `aria-label`s.
 
 ### 7 · Verification
-1. `node --test tests/` is green.
+1. `node --test 'tests/*.test.mjs'` is green.
 2. `python3 dev/serve.py` serves `dev/card-preview.html`.
    - **Offline mode** uses the fake `hass` built from the synthetic fixtures. Look at both cards in the Browser pane on
      a desktop and a mobile viewport, in RTL and LTR, and fix what looks wrong.
