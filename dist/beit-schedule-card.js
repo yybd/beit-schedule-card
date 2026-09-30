@@ -622,6 +622,22 @@ export async function setModeMembership(hass, labelName, entityIds, member) {
   return label;
 }
 
+/**
+ * Puts an automation into a mode, or takes it out, together with the schedules its config refers to. Taking it out
+ * leaves a schedule in the mode while another automation of the mode still follows it.
+ */
+export async function setAutomationInMode(hass, labelName, automationId, member) {
+  const schedules = schedulesIn(await automationConfig(hass, automationId));
+  if (member) return setModeMembership(hass, labelName, [automationId, ...schedules], true);
+  const registry = await loadRegistry(hass);
+  const stillUsed = new Set();
+  for (const other of modeMembers(hass.states, registry, labelName)) {
+    if (other.entity_id === automationId) continue;
+    for (const id of schedulesIn(await automationConfig(hass, other.entity_id).catch(() => null))) stillUsed.add(id);
+  }
+  return setModeMembership(hass, labelName, [automationId, ...schedules.filter((id) => !stillUsed.has(id))], false);
+}
+
 /** The entities of a mode, by name, sorted by their display name. */
 export function modeMembers(states, registry, labelName, domain = 'automation') {
   const label = labelNamed(registry, labelName);
@@ -2382,9 +2398,8 @@ class MembershipDialog {
     this.busy.add(id);
     this.renderList();
     try {
-      // The automation and the schedules it follows move together.
-      const schedules = schedulesIn(await automationConfig(h, id));
-      await setModeMembership(h, this.mode, [id, ...schedules], member);
+      // The automation and the schedules it follows move together; a schedule another member still follows stays.
+      await setAutomationInMode(h, this.mode, id, member);
       await this.card._loadLabels();
     } catch (err) {
       this.card._toast(errorText(err));

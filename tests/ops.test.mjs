@@ -401,3 +401,22 @@ test('setAutoStart replaces only the start trigger, and the description while it
   assert.equal(cfg.description, `${BEIT_MARKER} — older wording`);
   assert.equal(cfg.triggers[0].at, '13:00:00');
 });
+
+import { setAutomationInMode } from '../dist/beit-schedule-card.js';
+
+test('taking an automation out of a mode keeps a schedule another member still follows', async () => {
+  const hass = house();
+  // Both the Beit automation and the hand-written fan follow the living-room schedule.
+  await setAutomationInMode(hass, 'שבת', 'automation.living_room_fan_shabbat', false);
+  let reg = await loadRegistry(hass);
+  assert.deepEqual(reg.entityLabels['automation.living_room_fan_shabbat'], []);
+  assert.deepEqual(reg.entityLabels['schedule.living_room_ac_shabbat'], ['shbt']);
+  // The last one out takes the schedule with it.
+  await setAutomationInMode(hass, 'שבת', 'automation.beit_living_room_ac_shabbat', false);
+  reg = await loadRegistry(hass);
+  assert.deepEqual(reg.entityLabels['schedule.living_room_ac_shabbat'], []);
+  // And in again: the automation and its schedule.
+  await setAutomationInMode(hass, 'חג', 'automation.beit_water_heater_weekdays', true);
+  reg = await loadRegistry(hass);
+  assert.deepEqual(reg.entityLabels['schedule.water_heater_weekdays'], ['energy', 'khg']);
+});

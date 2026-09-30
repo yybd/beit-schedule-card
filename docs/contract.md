@@ -73,6 +73,8 @@ Written with `POST /api/config/automation/config/<id>`. From a card this is `has
 - **A mode is an HA label.** Labels are identified by **name**, `שבת` and `חג`, never by id. HA slugs Hebrew names (for example `shbt`), and the slug is not guaranteed.
 - **Creating a missing label:** `config/label_registry/create {name, icon: "mdi:candle" | "mdi:star-david", color: "amber" | "indigo"}`.
 - **Membership:** an automation, and the schedules it follows, carry the label. Write it with `config/entity_registry/update {entity_id, labels: [...]}`. That call **replaces** the list, so merge with the existing labels, which you read from `config/entity_registry/list_for_display` → `lb`.
+- **Taking an automation out of a mode** also takes out the schedules its config refers to, except those another
+  automation of the mode still refers to.
 - **Switching a mode:** `automation.turn_on` / `automation.turn_off` with target `{label_id}`, or with the member list. The switch shows:
   - "on" when every member is on;
   - "partial" when some are;
