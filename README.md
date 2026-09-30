@@ -1,4 +1,4 @@
-<h1 align="center">Beit Schedule Card</h1>
+<h1 align="center">Beit Weekly Schedule</h1>
 
 <p align="center">
   <b>A weekly schedule card for any device</b>, for any home, on your Home Assistant dashboard.<br>
@@ -23,7 +23,7 @@
 - [Two cards](#two-cards)
 - [Features](#features)
 - [Screenshots](#screenshots)
-- [Why Beit Schedule Card](#why-beit-schedule-card)
+- [Why Beit Weekly Schedule](#why-beit-weekly-schedule)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Configuration](#configuration)
@@ -92,12 +92,12 @@ Hebrew, the cards are in Hebrew and the whole layout is right to left.
 |:-:|:-:|
 | <img src="https://raw.githubusercontent.com/yybd/beit-schedule-card/main/docs/dark-english.png" alt="Both cards with a dark theme and a fixed height" width="440"> | <img src="https://raw.githubusercontent.com/yybd/beit-schedule-card/main/docs/mobile.png" alt="The editor full screen on a phone" width="220"> |
 
-## Why Beit Schedule Card
+## Why Beit Weekly Schedule
 
 Home Assistant already has good scheduling tools. This card makes a different trade-off. **It writes Home Assistant's
 own objects rather than bringing its own scheduling engine.**
 
-| | **Beit Schedule Card** | Built-in schedule helper editor | [Scheduler card + component](https://github.com/nielsfaber/scheduler-component) | [Weekly Schedule Card](https://community.home-assistant.io/t/weekly-schedule-card-a-visual-weekly-grid-card-for-the-scheduler-component/1012671) | [schedule_state](https://github.com/aneeshd/schedule_state) |
+| | **Beit Weekly Schedule** | Built-in schedule helper editor | [Scheduler card + component](https://github.com/nielsfaber/scheduler-component) | [Weekly Schedule Card](https://community.home-assistant.io/t/weekly-schedule-card-a-visual-weekly-grid-card-for-the-scheduler-component/1012671) | [schedule_state](https://github.com/aneeshd/schedule_state) |
 |---|:-:|:-:|:-:|:-:|:-:|
 | Stores schedules in HA's native `schedule` helper | ✅ | ✅ | ❌ own storage | ❌ scheduler component | ❌ own sensor |
 | Needs a custom integration on the server | **No** | No | Yes | Yes | Yes |
@@ -125,7 +125,7 @@ own objects rather than bringing its own scheduling engine.**
    write the same objects.
 
 **Where other tools go further.** The Scheduler card supports arbitrary service calls, conditions and sun-based times.
-The Weekly Schedule Card and the built-in editor let you draw ranges by dragging on a grid. Beit Schedule Card focuses
+The Weekly Schedule Card and the built-in editor let you draw ranges by dragging on a grid. Beit Weekly Schedule focuses
 on device schedules and Shabbat/chag modes.
 
 ## Requirements
@@ -147,7 +147,7 @@ Or add it by hand:
 1. In Home Assistant, open **HACS**.
 2. Open the menu (⋮) → **Custom repositories**.
 3. Add `https://github.com/yybd/beit-schedule-card` with type **Dashboard**.
-4. Search for **Beit Schedule Card**, open it and select **Download**.
+4. Search for **Beit Weekly Schedule**, open it and select **Download**.
 5. Reload the browser.
 
 HACS registers the dashboard resource for you.
@@ -164,8 +164,8 @@ HACS registers the dashboard resource for you.
 
 After installing, reload the browser. Then either:
 
-- **One click: a Beit Schedule dashboard.** Open any dashboard → ⋮ → *Edit dashboard* → *Add card* → **Beit — תזמונים /
-  Schedules**. At the top of the card's editor, **Create the Beit Schedule dashboard** adds a new dashboard named *Beit Schedule*
+- **One click: a Beit Schedule dashboard.** Open any dashboard → ⋮ → *Edit dashboard* → *Add card* → **Beit Weekly
+  Schedule**. At the top of the card's editor, **Create the Beit Schedule dashboard** adds a new dashboard named *Beit Schedule*
   to the sidebar, with both cards. Nothing else is changed; if it already exists, the button offers to open it.
   You can close the Add card dialog without adding the card.
 - **By hand.** *Settings → Dashboards → Add dashboard → New dashboard from scratch*, name it, open it, then ⋮ → *Edit

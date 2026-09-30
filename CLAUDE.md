@@ -1,4 +1,4 @@
-# Beit Schedule Card
+# Beit Weekly Schedule
 
 A Home Assistant dashboard plugin (HACS, category *Dashboard*): `dist/beit-schedule-card.js` registers
 `beit-schedule-card` and `beit-shabbat-card`. The plan is [PLAN.md](PLAN.md). The data model shared with the Beit app is

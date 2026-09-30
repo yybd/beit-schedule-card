@@ -1,5 +1,5 @@
 /*
- * Beit Schedule Card — weekly schedules for any device, with Shabbat and chag modes.
+ * Beit Weekly Schedule — weekly schedules for any device, with optional Shabbat and Jewish holiday modes.
  *
  *   type: custom:beit-schedule-card
  *   type: custom:beit-shabbat-card
@@ -11,7 +11,7 @@
  * Custom elements are registered only where `customElements` exists.
  */
 
-export const VERSION = '1.2.3';
+export const VERSION = '1.2.4';
 
 // ---------------------------------------------------------------------------- week model
 
@@ -2960,7 +2960,7 @@ export { BeitScheduleCardEditor, BeitShabbatCardEditor };
 export { BeitScheduleCard, BeitShabbatCard, BeitCardBase };
 
 if (typeof customElements !== 'undefined') {
-  console.info(`%c BEIT-SCHEDULE-CARD %c ${VERSION} `, 'background:#ffa000;color:#000;font-weight:600', 'background:#333;color:#fff');
+  console.info(`%c BEIT-WEEKLY-SCHEDULE %c ${VERSION} `, 'background:#ffa000;color:#000;font-weight:600', 'background:#333;color:#fff');
   if (!customElements.get('beit-schedule-card')) customElements.define('beit-schedule-card', BeitScheduleCard);
   if (!customElements.get('beit-shabbat-card')) customElements.define('beit-shabbat-card', BeitShabbatCard);
   if (!customElements.get('beit-schedule-card-editor')) customElements.define('beit-schedule-card-editor', BeitScheduleCardEditor);
@@ -2969,7 +2969,7 @@ if (typeof customElements !== 'undefined') {
   if (!window.customCards.some((c) => c.type === 'beit-schedule-card')) {
     window.customCards.push({
       type: 'beit-schedule-card',
-      name: 'Beit — תזמונים / Schedules',
+      name: 'Beit Weekly Schedule',
       description: 'Weekly schedules for any device, in any home; optional Shabbat and Jewish holiday modes. תזמון שבועי לכל מכשיר.',
       preview: false,
     });
@@ -2977,7 +2977,7 @@ if (typeof customElements !== 'undefined') {
   if (!window.customCards.some((c) => c.type === 'beit-shabbat-card')) {
     window.customCards.push({
       type: 'beit-shabbat-card',
-      name: 'Beit — שבת וחג / Shabbat & chag',
+      name: 'Beit Weekly Schedule — Shabbat & Jewish holidays (שבת וחג)',
       description: 'Optional: Shabbat and Jewish holiday (chag) modes, automatic Shabbat and chag, and the times. מצבי שבת וחג.',
       preview: false,
     });
