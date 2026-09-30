@@ -11,7 +11,7 @@
  * Custom elements are registered only where `customElements` exists.
  */
 
-export const VERSION = '1.2.2';
+export const VERSION = '1.2.3';
 
 // ---------------------------------------------------------------------------- week model
 
@@ -2970,7 +2970,7 @@ if (typeof customElements !== 'undefined') {
     window.customCards.push({
       type: 'beit-schedule-card',
       name: 'Beit — תזמונים / Schedules',
-      description: 'Weekly schedules for any device, in any home; optional Shabbat and chag modes. תזמון שבועי לכל מכשיר.',
+      description: 'Weekly schedules for any device, in any home; optional Shabbat and Jewish holiday modes. תזמון שבועי לכל מכשיר.',
       preview: false,
     });
   }
@@ -2978,7 +2978,7 @@ if (typeof customElements !== 'undefined') {
     window.customCards.push({
       type: 'beit-shabbat-card',
       name: 'Beit — שבת וחג / Shabbat & chag',
-      description: 'Optional: Shabbat and chag modes, automatic Shabbat and chag, and the times. מצבי שבת וחג.',
+      description: 'Optional: Shabbat and Jewish holiday (chag) modes, automatic Shabbat and chag, and the times. מצבי שבת וחג.',
       preview: false,
     });
   }
