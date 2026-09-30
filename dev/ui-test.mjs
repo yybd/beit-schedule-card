@@ -209,6 +209,20 @@ const CHECKS = [
     const sc = S().querySelector('.scroll');
     must(sc.scrollHeight > sc.clientHeight && getComputedStyle(sc).overflowY === 'auto', 'scrolls');
   `],
+  ['the visual editor creates the Beit dashboard, once', 'editors=1', `
+    const ed = document.querySelector('beit-schedule-card-editor').shadowRoot;
+    await sleep(200);
+    click(ed.querySelector('[data-act=makeDash]'), 'create button');
+    await sleep(300);
+    must(fake._dashboards.some((d) => d.url_path === 'beit-schedules'), 'dashboard created');
+    must(fake._lovelace['beit-schedules'].views[0].cards.length === 2, 'with both cards');
+    must(ed.querySelector('[data-dash] a[href="/beit-schedules/beit"]'), 'Open link');
+    must(!ed.querySelector('[data-act=makeDash]'), 'no second button');
+  `],
+  ['a non-admin editor offers no dashboard', 'editors=1&admin=0', `
+    await sleep(300);
+    must(document.querySelector('beit-schedule-card-editor').shadowRoot.querySelector('[data-dash]').hidden, 'hidden');
+  `],
   ['the visual editor limits device types', 'editors=1', `
     const ed = document.querySelector('beit-schedule-card-editor').shadowRoot;
     toggle(ed.querySelector('[data-domain=climate]'), false, 'climate');

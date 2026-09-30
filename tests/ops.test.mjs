@@ -495,3 +495,38 @@ test('per-block data survives a round trip', () => {
   assert.deepEqual(w.toHA().monday, [{ from: '07:00:00', to: '08:00:00', data: { mode: 'eco' } }]);
   assert.deepEqual(w.clone().toHA().monday[0].data, { mode: 'eco' });
 });
+
+// ---- the Beit dashboard --------------------------------------------------------------------------------------------
+
+import { createBeitDashboard, findBeitDashboard, beitDashboardConfig, BEIT_DASHBOARD } from '../dist/beit-schedule-card.js';
+
+test('createBeitDashboard makes one new dashboard with both cards, and only once', async () => {
+  const hass = house();
+  assert.equal(await findBeitDashboard(hass), null);
+  const r = await createBeitDashboard(hass);
+  assert.equal(r.created, true);
+  assert.equal(r.url_path, 'beit-schedules');
+  const cfg = await hass.callWS({ type: 'lovelace/config', url_path: 'beit-schedules' });
+  assert.deepEqual(cfg.views[0].cards.map((c) => c.type), ['custom:beit-schedule-card', 'custom:beit-shabbat-card']);
+  assert.deepEqual(cfg, beitDashboardConfig());
+  const again = await createBeitDashboard(hass);
+  assert.equal(again.created, false);
+  assert.equal(hass.calls.filter((c) => c.type === 'lovelace/dashboards/create').length, 1);
+  // The other dashboard was never touched.
+  assert.ok(!hass.calls.some((c) => c.type === 'lovelace/config/save' && c.url_path !== BEIT_DASHBOARD.url_path));
+});
+
+test('an existing dashboard at that address is left alone', async () => {
+  const hass = new FakeHass({ ...fixtures, dashboards: [{ id: 'beit_schedules', url_path: 'beit-schedules', title: 'Mine', mode: 'storage' }] }, { now: SUNDAY_9AM });
+  const r = await createBeitDashboard(hass);
+  assert.equal(r.created, false);
+  assert.equal(r.title, 'Mine');
+  assert.ok(!hass.calls.some((c) => c.type === 'lovelace/config/save' || c.type === 'lovelace/dashboards/create'));
+});
+
+test('a dashboard whose content cannot be saved is removed again', async () => {
+  const hass = house();
+  hass.failNext('lovelace/config/save', 'boom');
+  await assert.rejects(createBeitDashboard(hass), /boom/);
+  assert.equal(await findBeitDashboard(hass), null);
+});

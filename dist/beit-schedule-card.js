@@ -11,7 +11,7 @@
  * Custom elements are registered only where `customElements` exists.
  */
 
-export const VERSION = '1.1.1';
+export const VERSION = '1.2.0';
 
 // ---------------------------------------------------------------------------- week model
 
@@ -810,6 +810,48 @@ export const findAutoShabbat = (hass) => findAuto(hass, 'שבת');
 export const enableAutoShabbat = (hass, options) => enableAuto(hass, 'שבת', options);
 export const disableAutoShabbat = (hass) => disableAuto(hass, 'שבת');
 
+// ---- the Beit dashboard ----
+
+/** The dashboard the card can create: a new one in the sidebar, with both cards. Never an existing one changed. */
+export const BEIT_DASHBOARD = { url_path: 'beit-schedules', view: 'beit', title: 'Beit', icon: 'mdi:calendar-clock' };
+
+export function beitDashboardConfig() {
+  return {
+    title: BEIT_DASHBOARD.title,
+    views: [{ title: BEIT_DASHBOARD.title, path: BEIT_DASHBOARD.view, cards: [{ type: 'custom:beit-schedule-card' }, { type: 'custom:beit-shabbat-card' }] }],
+  };
+}
+
+export async function findBeitDashboard(hass) {
+  const list = await hass.callWS({ type: 'lovelace/dashboards/list' });
+  return list.find((d) => d.url_path === BEIT_DASHBOARD.url_path) || null;
+}
+
+/**
+ * Creates the Beit dashboard. If one is already at that address it is left as it is (`created: false`). If its
+ * content cannot be saved, the empty dashboard just created is removed again.
+ */
+export async function createBeitDashboard(hass) {
+  const existing = await findBeitDashboard(hass);
+  if (existing) return { ...existing, created: false };
+  const created = await hass.callWS({
+    type: 'lovelace/dashboards/create',
+    url_path: BEIT_DASHBOARD.url_path,
+    title: BEIT_DASHBOARD.title,
+    icon: BEIT_DASHBOARD.icon,
+    show_in_sidebar: true,
+    require_admin: false,
+    mode: 'storage',
+  });
+  try {
+    await hass.callWS({ type: 'lovelace/config/save', url_path: BEIT_DASHBOARD.url_path, config: beitDashboardConfig() });
+  } catch (err) {
+    await hass.callWS({ type: 'lovelace/dashboards/delete', dashboard_id: created.id }).catch(() => {});
+    throw err;
+  }
+  return { ...created, created: true };
+}
+
 export const entityName = (st) => st?.attributes?.friendly_name || st?.entity_id || '';
 
 // ---------------------------------------------------------------------------- device picker
@@ -1024,6 +1066,12 @@ export const STRINGS = {
     edNone: 'כלום',
     edModes: 'מצבים',
     edShowCalendar: 'הצגת זמני השבת והחג',
+    edDashboard: 'דשבורד Beit בסרגל הצד',
+    edDashboardHint: 'יוצר דשבורד חדש בשם Beit עם שני הכרטיסים. דשבורדים קיימים לא משתנים.',
+    edDashboardCreate: 'צור דשבורד Beit',
+    edDashboardExists: 'הדשבורד Beit כבר קיים.',
+    edDashboardCreated: 'הדשבורד נוצר ומופיע בסרגל הצד.',
+    edDashboardOpen: 'פתח',
     edHeight: 'גובה',
     edHeightHint: 'אוטומטי — או למשל 500px או 60vh; התוכן נגלל בתוך הכרטיס',
   },
@@ -1155,6 +1203,12 @@ export const STRINGS = {
     edNone: 'None',
     edModes: 'Modes',
     edShowCalendar: 'Show Shabbat and chag times',
+    edDashboard: 'A Beit dashboard in the sidebar',
+    edDashboardHint: 'Creates a new dashboard named Beit with both cards. Existing dashboards are not changed.',
+    edDashboardCreate: 'Create the Beit dashboard',
+    edDashboardExists: 'The Beit dashboard already exists.',
+    edDashboardCreated: 'The dashboard was created; it is in the sidebar.',
+    edDashboardOpen: 'Open',
     edHeight: 'Height',
     edHeightHint: 'Automatic, or e.g. 500px or 60vh; the content scrolls inside the card',
   },
@@ -2711,11 +2765,58 @@ class BeitEditorBase extends Base {
   set hass(hass) {
     const first = !this._hass;
     this._hass = hass;
-    if (first) this._render();
+    if (first) {
+      this._render();
+      this._loadDash();
+    }
   }
 
   get _t() {
     return STRINGS[langOf(this._hass)];
+  }
+
+  // ---- "Create the Beit dashboard", shared by both editors ----
+
+  async _loadDash() {
+    if (this._hass?.user?.is_admin === false) return;
+    try {
+      this._dash = { existing: await findBeitDashboard(this._hass) };
+    } catch {
+      this._dash = null; // no dashboards API here (e.g. YAML mode): no section
+    }
+    this._renderDash();
+  }
+
+  async _createDash() {
+    this._dash = { ...this._dash, busy: true, error: null };
+    this._renderDash();
+    try {
+      const r = await createBeitDashboard(this._hass);
+      this._dash = { existing: r, created: r.created };
+    } catch (err) {
+      this._dash = { ...this._dash, busy: false, error: errorText(err) };
+    }
+    this._renderDash();
+  }
+
+  _renderDash() {
+    const el = this.shadowRoot?.querySelector('[data-dash]');
+    if (!el) return;
+    const t = this._t;
+    const d = this._dash;
+    if (!d || this._hass?.user?.is_admin === false) {
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    const href = `/${BEIT_DASHBOARD.url_path}/${BEIT_DASHBOARD.view}`;
+    el.innerHTML = `<h3>${esc(t.edDashboard)}</h3>
+      ${d.existing
+        ? `<p class="hint">${esc(d.created ? t.edDashboardCreated : t.edDashboardExists)} <a href="${esc(href)}" target="_top">${esc(t.edDashboardOpen)}</a></p>`
+        : `<p class="hint">${esc(t.edDashboardHint)}</p>
+           <div><button class="make" data-act="makeDash" ${d.busy ? 'disabled' : ''}>${esc(t.edDashboardCreate)}</button></div>`}
+      ${d.error ? `<p class="err" role="alert">${esc(d.error)}</p>` : ''}`;
+    el.querySelector('[data-act=makeDash]')?.addEventListener('click', () => this._createDash());
   }
 
   _emit(config) {
@@ -2729,7 +2830,9 @@ class BeitEditorBase extends Base {
 
   _shell(inner) {
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
-    this.shadowRoot.innerHTML = `<style>${CONFIG_EDITOR_STYLE}</style><div class="ed" dir="${langOf(this._hass) === 'he' ? 'rtl' : 'ltr'}">${inner}</div>`;
+    this.shadowRoot.innerHTML = `<style>${CONFIG_EDITOR_STYLE}</style><div class="ed" dir="${langOf(this._hass) === 'he' ? 'rtl' : 'ltr'}">
+      <section data-dash class="dash" hidden></section>${inner}</div>`;
+    this._renderDash();
     return this.shadowRoot;
   }
 }
@@ -2849,6 +2952,12 @@ const CONFIG_EDITOR_STYLE = `
   .list { display: flex; flex-direction: column; max-height: 280px; overflow-y: auto; border: 1px solid var(--divider-color); border-radius: 10px; }
   .row { padding: 7px 10px; border-bottom: 1px solid var(--divider-color); }
   .row:last-child { border-bottom: 0; }
+  .dash { padding: 12px; border-radius: 10px; background: color-mix(in srgb, var(--primary-color) 8%, transparent); }
+  .make { font: inherit; font-size: 14px; font-weight: 500; padding: 7px 14px; border-radius: 18px; cursor: pointer;
+    border: 0; background: var(--primary-color); color: var(--text-primary-color, #fff); }
+  .make:disabled { opacity: .5; cursor: default; }
+  .hint a { color: var(--primary-color); }
+  .err { color: var(--error-color, #db4437); font-size: 13px; margin: 0; }
   .types { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 12px; }
   .actions { display: flex; gap: 12px; }
   .actions button { font: inherit; font-size: 12px; color: var(--primary-color); background: none; border: 0; padding: 0; cursor: pointer; }

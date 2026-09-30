@@ -39,6 +39,8 @@ export class FakeHass {
     this._listeners = new Set();
     this._schedules = f.schedule_list || [];
     this._yamlSchedules = f.yaml_schedules || {}; // what get_schedule knows of YAML schedules
+    this._dashboards = f.dashboards || [{ id: 'map', url_path: 'map', title: 'Map', mode: 'storage', show_in_sidebar: true, require_admin: false }];
+    this._lovelace = {};
     this._configs = {}; // automation config id -> {entityId, config}
     for (const [entityId, config] of Object.entries(f.automation_configs || {})) this._configs[config.id] = { entityId, config };
     this._labels = f.label_registry || [];
@@ -355,6 +357,30 @@ const WS = {
     this._rebuildEntities();
     this._emit();
     return { entity_entry: { entity_id: msg.entity_id, labels: next.lb } };
+  },
+  'lovelace/dashboards/list'() {
+    return this._dashboards;
+  },
+  'lovelace/dashboards/create'(msg) {
+    if (!String(msg.url_path).includes('-')) throw new HAError('invalid_format', 'Url path needs to contain a hyphen (-)');
+    if (this._dashboards.some((d) => d.url_path === msg.url_path)) throw new HAError('home_assistant_error', 'URL path already exists');
+    const { type: _type, id: _id, ...rest } = msg;
+    const item = { id: msg.url_path.replace(/-/g, '_'), mode: 'storage', ...rest };
+    this._dashboards = [...this._dashboards, item];
+    return item;
+  },
+  'lovelace/dashboards/delete'(msg) {
+    this._dashboards = this._dashboards.filter((d) => d.id !== msg.dashboard_id);
+    return null;
+  },
+  'lovelace/config/save'(msg) {
+    if (!this._dashboards.some((d) => d.url_path === msg.url_path)) throw new HAError('config_not_found', 'No config found.');
+    this._lovelace[msg.url_path] = msg.config;
+    return null;
+  },
+  'lovelace/config'(msg) {
+    if (!(msg.url_path in this._lovelace)) throw new HAError('config_not_found', 'No config found.');
+    return this._lovelace[msg.url_path];
   },
   'config/area_registry/list'() {
     return this._areas;
