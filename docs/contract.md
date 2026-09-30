@@ -81,6 +81,7 @@ Written with `POST /api/config/automation/config/<id>`. From a card this is `has
   - Fridays at 12:00 it turns the label on. That is before typical Friday-afternoon schedules; candle lighting is too late.
   - When Shabbat ends (see §4), it waits until every `schedule.*` carrying the label is off (6 h timeout), then turns the label off with `stop_actions: false`.
   - The card creates it on request, and **recognises** an existing one by the marker and the alias, so there is never a second.
+  - Switching it off **disables** it (`automation.turn_off`). The card never deletes it, so changes the user made to it survive.
 
 ## 4. Calendar sources
 

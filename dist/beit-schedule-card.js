@@ -598,14 +598,13 @@ export async function enableAutoShabbat(hass, { waitOptions } = {}) {
   return entity.entity_id;
 }
 
-/** Turns automatic Shabbat off: deletes the automation if Beit wrote it, otherwise only switches it off. */
+/**
+ * Turns automatic Shabbat off by disabling its automation. It is never deleted: whatever the user changed in it
+ * survives, and switching on again enables the same one.
+ */
 export async function disableAutoShabbat(hass) {
   const existing = await findAutoShabbat(hass);
   if (!existing) return null;
-  if (existing.ours && existing.config?.id != null) {
-    await hass.callApi('DELETE', `config/automation/config/${existing.config.id}`);
-    return 'deleted';
-  }
   await setAutomationEnabled(hass, existing.entityId, false);
   return 'turned_off';
 }
@@ -752,8 +751,7 @@ export const STRINGS = {
     noAutomations: 'לא נמצאו אוטומציות',
     autoShabbat: 'שבת אוטומטית',
     autoShabbatHint: 'מדליק את מצב השבת בשישי ב-12:00, ומכבה אחרי צאת השבת כשכל תזמוני השבת הסתיימו.',
-    autoShabbatNotOurs: 'אוטומציה בשם הזה נכתבה ידנית — כיבוי רק ישבית אותה.',
-    autoShabbatDelete: 'לכבות את השבת האוטומטית? האוטומציה תימחק, ואפשר ליצור אותה שוב בלחיצה.',
+    autoShabbatNotOurs: 'אוטומציה בשם הזה נכתבה ידנית — הכרטיס רק מדליק ומכבה אותה.',
     autoChagHint: 'מצב חג אוטומטי עוד לא זמין. אינטגרציית Jewish Calendar מאפשרת אותו בעתיד.',
     calToday: 'היום',
     calParasha: 'פרשה',
@@ -864,8 +862,7 @@ export const STRINGS = {
     noAutomations: 'No automations found',
     autoShabbat: 'Automatic Shabbat',
     autoShabbatHint: 'Turns Shabbat mode on on Friday at 12:00, and off after Shabbat ends once every Shabbat schedule has finished.',
-    autoShabbatNotOurs: 'An automation with this name was written by hand; switching off only disables it.',
-    autoShabbatDelete: 'Turn automatic Shabbat off? Its automation is deleted; one click creates it again.',
+    autoShabbatNotOurs: 'An automation with this name was written by hand; the card only switches it on and off.',
     autoChagHint: 'Automatic chag mode is not available yet. The Jewish Calendar integration makes it possible later.',
     calToday: 'Today',
     calParasha: 'Parasha',
@@ -2095,10 +2092,6 @@ class BeitShabbatCard extends BeitCardBase {
       await this._run(() => setAutomationEnabled(this._h, d.auto, on));
       this._render(true);
     } else if (d.autoshabbat) {
-      if (!on && this._auto?.ours && !confirm(this._t.autoShabbatDelete)) {
-        e.target.checked = true;
-        return;
-      }
       this._busy = 'auto';
       this._render(true);
       await this._run(() => (on ? enableAutoShabbat(this._h) : disableAutoShabbat(this._h)));

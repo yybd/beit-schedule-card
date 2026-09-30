@@ -218,8 +218,14 @@ test('an existing auto-Shabbat automation with the marker is recognised and neve
   assert.equal((await findAutoShabbat(hass)).entityId, 'automation.auto_shabbat_older');
   assert.equal(await enableAutoShabbat(hass, FAST), 'automation.auto_shabbat_older');
   assert.ok(!hass.calls.some((c) => c.method === 'POST'));
-  assert.equal(await disableAutoShabbat(hass), 'deleted');
-  assert.deepEqual(hass.calls.at(-1), { kind: 'api', method: 'DELETE', path: 'config/automation/config/1700000000000', body: undefined });
+  // Switching off disables it; it is never deleted.
+  assert.equal(await disableAutoShabbat(hass), 'turned_off');
+  assert.equal(hass.states['automation.auto_shabbat_older'].state, 'off');
+  assert.ok(!hass.calls.some((c) => c.method === 'DELETE'));
+  // On again: the same automation, not a new one.
+  assert.equal(await enableAutoShabbat(hass, FAST), 'automation.auto_shabbat_older');
+  assert.equal(hass.states['automation.auto_shabbat_older'].state, 'on');
+  assert.ok(!hass.calls.some((c) => c.method === 'POST'));
 });
 
 test('a hand-written automation with the same alias is only switched off, never deleted', async () => {
