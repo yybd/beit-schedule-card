@@ -142,13 +142,34 @@ Or add it by hand:
 
 HACS registers the dashboard resource for you.
 
-### Manual
+### Manual installation
 
 1. Download `beit-schedule-card.js` from the [latest release](https://github.com/yybd/beit-schedule-card/releases/latest).
 2. Copy it to `/config/www/beit-schedule-card.js`.
 3. Go to *Settings → Dashboards → ⋮ → Resources → Add resource*.
 4. Enter the URL `/local/beit-schedule-card.js` with type **JavaScript module**.
 5. Reload the browser.
+
+### Add the cards
+
+After installing, reload the browser. Then either:
+
+- **One click: a Beit dashboard.** Open any dashboard → ⋮ → *Edit dashboard* → *Add card* → **Beit — תזמונים /
+  Schedules**. At the top of the card's editor, **Create the Beit dashboard** adds a new dashboard named *Beit* to the
+  sidebar, with both cards. Nothing else is changed; if a Beit dashboard already exists, the button offers to open it.
+  You can close the Add card dialog without adding the card.
+- **By hand.** *Settings → Dashboards → Add dashboard → New dashboard from scratch*, name it, open it, then ⋮ → *Edit
+  dashboard* → ⋮ → *Raw configuration editor*, and paste:
+
+  ```yaml
+  views:
+    - title: Beit
+      cards:
+        - type: custom:beit-schedule-card
+        - type: custom:beit-shabbat-card
+  ```
+
+  Or add the cards to any existing dashboard from *Add card*: search for **Beit**.
 
 ## Configuration
 
