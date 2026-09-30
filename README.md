@@ -19,6 +19,7 @@
 
 ## Contents
 
+- [Two cards](#two-cards)
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [Why Beit Schedule Card](#why-beit-schedule-card)
@@ -32,7 +33,18 @@
 - [Contributing](#contributing)
 - [License](#license)
 
+## Two cards
+
+The package contains **two separate cards**. Add one or both; each works on its own.
+
+| | Card | What it is for |
+|:-:|---|---|
+| 🗓️ | **Schedules**<br>`custom:beit-schedule-card` | **Setting up schedules.** Create and edit a weekly schedule for any device: the hours for each day, and what the device does. For every house; if you have no use for Shabbat and chag, turn them off with `show_modes: false`. |
+| 🕯️ | **Shabbat & chag**<br>`custom:beit-shabbat-card` | **Setting up the Shabbat and chag modes.** Switch each mode on or off, choose which automations belong to it, set automatic Shabbat and chag, and see candle lighting, havdalah and the parasha. |
+
 ## Features
+
+### 🗓️ Schedules card
 
 - **Schedule a device in one step.** Choose a device (air conditioner, light, water heater, plug, blinds), what it should
   do while the schedule is active (HVAC mode, temperature, brightness), and the hours for each day of the week. The card
@@ -40,6 +52,11 @@
 - **Edit every schedule in the house.** A clear week view for each UI-managed schedule helper. You can add ranges, copy a
   day to the other weekdays or to the whole week, and set ranges that run until midnight. For a schedule the card
   created, you can also change the device and what it does; renaming a schedule renames its automation too.
+- **Put a schedule in a mode.** Mark it as a Shabbat or chag schedule, so the Shabbat & chag card switches it with the
+  rest of the mode.
+
+### 🕯️ Shabbat & chag card
+
 - **Shabbat and chag modes.** A single switch turns on or off every automation that belongs to a mode, and the card
   shows whether the mode is fully on, partly on or off.
 - **Automatic Shabbat and chag.** Switches the mode on before its schedules begin (at a time you choose, or some hours
@@ -47,7 +64,11 @@
   left running.
 - **Jewish calendar on the card.** Candle lighting, havdalah, the parasha and today's holiday, from the core
   [Jewish Calendar](https://www.home-assistant.io/integrations/jewish_calendar/) integration (or Hebcal, if installed).
+
+### Both
+
 - **Hebrew first.** Full right-to-left layout and a week that starts on Sunday. English is also supported.
+- **Visual editors.** Both cards are set up from the dashboard's own card editor; no YAML needed.
 
 ## Screenshots
 
@@ -131,10 +152,10 @@ HACS registers the dashboard resource for you.
 
 ## Configuration
 
-The package contains two cards. Both can be added from the dashboard's **Add card** dialog and configured in the
-visual editor.
+The package contains two cards (see [Two cards](#two-cards)). Both can be added from the dashboard's **Add card** dialog
+and configured in the visual editor.
 
-### Schedules card
+### 🗓️ Schedules card
 
 ```yaml
 type: custom:beit-schedule-card
@@ -156,7 +177,7 @@ entities:                  # optional: show only these schedules
 | `device_domains` | list | all | Device types offered when choosing a device, e.g. `[climate, light, water_heater]`. |
 | `show_modes` | boolean | `true` | Show Shabbat and chag: the mode chips and the mode choice in the editor. Turn it off if you have no use for them. |
 
-### Shabbat and chag card
+### 🕯️ Shabbat & chag card
 
 ```yaml
 type: custom:beit-shabbat-card
