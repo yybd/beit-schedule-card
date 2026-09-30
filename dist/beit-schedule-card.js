@@ -2970,7 +2970,7 @@ if (typeof customElements !== 'undefined') {
     window.customCards.push({
       type: 'beit-schedule-card',
       name: 'Beit — תזמונים / Schedules',
-      description: 'לוח זמנים שבועי לכל מכשיר, עם מצבי שבת וחג. Weekly device schedules with Shabbat and chag modes.',
+      description: 'Weekly schedules for any device, in any home; optional Shabbat and chag modes. תזמון שבועי לכל מכשיר.',
       preview: false,
     });
   }
@@ -2978,7 +2978,7 @@ if (typeof customElements !== 'undefined') {
     window.customCards.push({
       type: 'beit-shabbat-card',
       name: 'Beit — שבת וחג / Shabbat & chag',
-      description: 'מצבי שבת וחג בלחיצה, שבת אוטומטית וזמני השבת. Shabbat and chag modes, automatic Shabbat, and the times.',
+      description: 'Optional: Shabbat and chag modes, automatic Shabbat and chag, and the times. מצבי שבת וחג.',
       preview: false,
     });
   }

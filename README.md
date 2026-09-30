@@ -1,9 +1,10 @@
 <h1 align="center">Beit Schedule Card</h1>
 
 <p align="center">
-  Weekly schedules for any device, with <b>Shabbat and chag modes</b>, on your Home Assistant dashboard.<br>
+  <b>A weekly schedule card for any device</b>, for any home, on your Home Assistant dashboard.<br>
   Built entirely on Home Assistant's own <b>schedule helper</b> and ordinary automations. No custom integration, no extra
-  engine running on your server.
+  engine running on your server.<br>
+  <i>Optional extra:</i> Shabbat and chag modes, for homes that keep them.
 </p>
 
 <p align="center">
@@ -35,12 +36,16 @@
 
 ## Two cards
 
+> **You don't need to keep Shabbat to use this.** The Schedules card is a general-purpose weekly scheduler for any
+> device in any home. Shabbat and chag are an optional extra: a second card you can simply not add, and a switch
+> (`show_modes: false`) that hides them from the Schedules card.
+
 The package contains **two separate cards**. Add one or both; each works on its own.
 
 | | Card | What it is for |
 |:-:|---|---|
-| 🗓️ | **Schedules**<br>`custom:beit-schedule-card` | **Setting up schedules.** Create and edit a weekly schedule for any device: the hours for each day, and what the device does. For every house; if you have no use for Shabbat and chag, turn them off with `show_modes: false`. |
-| 🕯️ | **Shabbat & chag**<br>`custom:beit-shabbat-card` | **Setting up the Shabbat and chag modes.** Switch each mode on or off, choose which automations belong to it, set automatic Shabbat and chag, and see candle lighting, havdalah and the parasha. |
+| 🗓️ | **Schedules**<br>`custom:beit-schedule-card`<br>*the main card, for every home* | **Setting up schedules.** Create and edit a weekly schedule for any device (air conditioner, heating, lights, water heater, plugs, blinds): the hours for each day, and what the device does. To hide everything about Shabbat and chag, set `show_modes: false`. |
+| 🕯️ | **Shabbat & chag**<br>`custom:beit-shabbat-card`<br>*optional* | **For homes that keep Shabbat and chag.** Switch each mode on or off, choose which automations belong to it, set automatic Shabbat and chag, and see candle lighting, havdalah and the parasha. |
 
 ## Features
 
@@ -55,7 +60,7 @@ The package contains **two separate cards**. Add one or both; each works on its 
 - **Put a schedule in a mode.** Mark it as a Shabbat or chag schedule, so the Shabbat & chag card switches it with the
   rest of the mode.
 
-### 🕯️ Shabbat & chag card
+### 🕯️ Shabbat & chag card (optional)
 
 - **Shabbat and chag modes.** A single switch turns on or off every automation that belongs to a mode, and the card
   shows whether the mode is fully on, partly on or off.
@@ -200,7 +205,7 @@ entities:                  # optional: show only these schedules
 | `device_domains` | list | all | Device types offered when choosing a device, e.g. `[climate, light, water_heater]`. |
 | `show_modes` | boolean | `true` | Show Shabbat and chag: the mode chips and the mode choice in the editor. Turn it off if you have no use for them. |
 
-### 🕯️ Shabbat & chag card
+### 🕯️ Shabbat & chag card (optional)
 
 ```yaml
 type: custom:beit-shabbat-card
