@@ -525,6 +525,58 @@ export async function disableAutoShabbat(hass) {
 
 export const entityName = (st) => st?.attributes?.friendly_name || st?.entity_id || '';
 
+// ---------------------------------------------------------------------------- device picker
+
+/** Domains a schedule can drive, in the order the picker lists them (the app's tile domains, minus scene/script/lock). */
+export const PICKABLE_DOMAINS = ['light', 'switch', 'fan', 'cover', 'climate', 'water_heater', 'media_player', 'input_boolean', 'vacuum', 'siren', 'valve'];
+
+/**
+ * The picker's sections: devices grouped by area (the entity's own area, else its device's), areas by name, then the
+ * ones with no area. Hidden and auxiliary (config/diagnostic) entities are left out, as the app does.
+ * `display` is `config/entity_registry/list_for_display`.
+ */
+export function deviceSections({ states, display, devices = [], areas = [] }, query = '', noAreaTitle = 'ללא חדר', lang = 'he') {
+  const meta = Object.fromEntries((display?.entities || []).map((e) => [e.ei, e]));
+  const deviceArea = Object.fromEntries(devices.map((d) => [d.id, d.area_id]));
+  const q = query.trim().toLowerCase();
+  const byArea = new Map();
+  for (const e of Object.values(states || {})) {
+    const domain = domainOf(e.entity_id);
+    if (!PICKABLE_DOMAINS.includes(domain)) continue;
+    const m = meta[e.entity_id];
+    if (m && (m.hb || m.ec !== undefined && m.ec !== null)) continue;
+    const areaId = m?.ai ?? (m?.di ? deviceArea[m.di] : null) ?? null;
+    if (!byArea.has(areaId)) byArea.set(areaId, []);
+    byArea.get(areaId).push(e);
+  }
+  const order = (e) => PICKABLE_DOMAINS.indexOf(domainOf(e.entity_id));
+  const sorted = [...areas].sort((a, b) => a.name.localeCompare(b.name, lang));
+  const sections = [
+    ...sorted.map((a) => ({ areaId: a.area_id, title: a.name })),
+    { areaId: null, title: noAreaTitle },
+  ];
+  return sections
+    .map((sec) => ({
+      ...sec,
+      entities: (byArea.get(sec.areaId) || [])
+        .filter((e) => !q || entityName(e).toLowerCase().includes(q) || sec.title.toLowerCase().includes(q) || e.entity_id.includes(q))
+        .sort((a, b) => order(a) - order(b) || entityName(a).localeCompare(entityName(b), lang)),
+    }))
+    .filter((sec) => sec.entities.length);
+}
+
+/** What the editor offers for a device: HVAC modes, a temperature range, brightness. */
+export function actionOptions(st) {
+  const domain = domainOf(st.entity_id);
+  const a = st.attributes || {};
+  const hvacModes = domain === 'climate' ? (a.hvac_modes || []).filter((m) => m !== 'off') : [];
+  const temp = domain === 'climate' || domain === 'water_heater'
+    ? { min: Number(a.min_temp ?? 16), max: Number(a.max_temp ?? 30), initial: Number(a.temperature ?? Math.round(((a.min_temp ?? 16) + (a.max_temp ?? 30)) / 2)) }
+    : null;
+  const brightness = domain === 'light' && (a.supported_color_modes || []).some((m) => m !== 'onoff');
+  return { domain, hvacModes, defaultHvac: hvacModes.includes('cool') ? 'cool' : hvacModes[0] ?? null, temp, brightness };
+}
+
 // ---------------------------------------------------------------------------- strings
 
 export const STRINGS = {
@@ -548,6 +600,54 @@ export const STRINGS = {
     loading: 'טוען…',
     readOnly: 'צפייה בלבד — רק מנהל יכול לערוך',
     modeName: { שבת: 'שבת', חג: 'חג' },
+    editSchedule: 'עריכת תזמון',
+    name: 'שם התזמון',
+    type: 'סוג',
+    regular: 'רגיל',
+    modeHint: (m) => `יופעל ויכובה יחד עם שאר תזמוני ה${m}, מכרטיס "שבת וחג".`,
+    device: 'מכשיר',
+    chooseDevice: 'בחר מכשיר',
+    changeDevice: 'החלף',
+    searchDevice: 'חיפוש מכשיר או חדר',
+    noArea: 'ללא חדר',
+    noDevices: 'לא נמצאו מכשירים',
+    whileActive: 'מצב בזמן פעילות',
+    setTemp: 'לקבוע טמפרטורה',
+    brightness: 'בהירות',
+    turnOffAtEnd: 'לכבות בסוף הטווח',
+    closeAtEnd: 'לסגור בסוף הטווח',
+    drives: 'מפעיל את',
+    autoOn: 'אוטומציה פעילה',
+    autoOff: 'אוטומציה כבויה',
+    drivesNothing: 'אף אוטומציה לא משתמשת בתזמון הזה — הוא לא מפעיל כלום.',
+    hours: 'שעות פעילות',
+    addRange: 'טווח',
+    from: 'מ־',
+    to: 'עד',
+    midnightHint: 'סיום 00:00 = עד חצות',
+    ok: 'אישור',
+    cancel: 'ביטול',
+    copyTo: (day) => `להעתיק את יום ${day} אל…`,
+    weekdays: 'ימי חול',
+    wholeWeek: 'כל השבוע',
+    copy: 'העתק',
+    copyDays: 'העתק לימים אחרים',
+    clearAll: 'נקה הכול',
+    save: 'שמור',
+    delete: 'מחק',
+    close: 'סגור',
+    back: 'חזרה',
+    deleteQ: 'למחוק את התזמון?',
+    deleteText: 'האוטומציה שנוצרה עבורו תימחק גם היא. אוטומציות שנכתבו ידנית יישארו.',
+    kept: (list) => `נשארו אוטומציות שמפנות לתזמון שנמחק: ${list}`,
+    saveFailed: (e) => `השמירה נכשלה: ${e}`,
+    deleteFailed: (e) => `המחיקה נכשלה: ${e}`,
+    errEmpty: 'צריך לפחות טווח שעות אחד',
+    errDevice: 'בחר מכשיר שהתזמון יפעיל',
+    errRange: 'שעת הסיום לפני שעת ההתחלה',
+    editRange: 'עריכת טווח',
+    removeRange: 'מחיקת טווח',
+    hvac: { cool: 'קירור', heat: 'חימום', heat_cool: 'אוטומטי', auto: 'אוטומטי', dry: 'ייבוש', fan_only: 'מאוורר' },
   },
   en: {
     errName: 'The schedule needs a name',
@@ -569,6 +669,54 @@ export const STRINGS = {
     loading: 'Loading…',
     readOnly: 'View only — only an administrator can edit',
     modeName: { שבת: 'Shabbat', חג: 'Chag' },
+    editSchedule: 'Edit schedule',
+    name: 'Schedule name',
+    type: 'Type',
+    regular: 'Regular',
+    modeHint: (m) => `Switched on and off together with the other ${m} schedules, from the Shabbat & chag card.`,
+    device: 'Device',
+    chooseDevice: 'Choose a device',
+    changeDevice: 'Change',
+    searchDevice: 'Search a device or room',
+    noArea: 'No room',
+    noDevices: 'No devices found',
+    whileActive: 'Mode while active',
+    setTemp: 'Set a temperature',
+    brightness: 'Brightness',
+    turnOffAtEnd: 'Turn off at the end',
+    closeAtEnd: 'Close at the end',
+    drives: 'Drives',
+    autoOn: 'Automation on',
+    autoOff: 'Automation off',
+    drivesNothing: 'No automation uses this schedule, so it drives nothing.',
+    hours: 'Active hours',
+    addRange: 'Range',
+    from: 'From',
+    to: 'To',
+    midnightHint: 'An end of 00:00 means until midnight',
+    ok: 'OK',
+    cancel: 'Cancel',
+    copyTo: (day) => `Copy ${day} to…`,
+    weekdays: 'Weekdays',
+    wholeWeek: 'Whole week',
+    copy: 'Copy',
+    copyDays: 'Copy to other days',
+    clearAll: 'Clear all',
+    save: 'Save',
+    delete: 'Delete',
+    close: 'Close',
+    back: 'Back',
+    deleteQ: 'Delete this schedule?',
+    deleteText: 'The automation created for it is deleted too. Automations written by hand stay.',
+    kept: (list) => `These automations still refer to the deleted schedule: ${list}`,
+    saveFailed: (e) => `Saving failed: ${e}`,
+    deleteFailed: (e) => `Deleting failed: ${e}`,
+    errEmpty: 'Add at least one range of hours',
+    errDevice: 'Choose the device this schedule drives',
+    errRange: 'The range ends before it starts',
+    editRange: 'Edit range',
+    removeRange: 'Remove range',
+    hvac: { cool: 'Cool', heat: 'Heat', heat_cool: 'Auto', auto: 'Auto', dry: 'Dry', fan_only: 'Fan' },
   },
 };
 
@@ -600,6 +748,7 @@ const ICONS = {
   alert: 'M13,14H11V10H13M13,18H11V16H13M1,21H23L12,2L1,21Z',
   checklist: 'M3,5H9V11H3V5M5,7V9H7V7H5M11,7H21V9H11V7M11,15H21V17H11V15M5,20L1.5,16.5L2.91,15.09L5,17.17L9.59,12.59L11,14L5,20Z',
   minus: 'M19,13H5V11H19V13Z',
+  back: 'M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z',
 };
 const icon = (name, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
 const MODE_GLYPH = { שבת: '🕯️', חג: '✡️' };
@@ -609,6 +758,7 @@ const BASE_STYLE = `
   ha-card { overflow: hidden; }
   * { box-sizing: border-box; }
   .ic { width: 20px; height: 20px; fill: currentColor; flex: none; }
+  [dir=rtl] .ic.flip { transform: scaleX(-1); }
   button { font: inherit; color: inherit; }
   .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 18px; cursor: pointer;
     border: 1px solid var(--divider-color); background: transparent; color: var(--primary-color); font-size: 14px; font-weight: 500; }
@@ -720,13 +870,13 @@ class BeitCardBase extends Base {
     }) || null;
   }
 
-  _toast(text) {
+  _toast(text, ms = 6000) {
     const el = this._root().querySelector('.toast');
     if (!el) return;
     el.textContent = text;
     el.hidden = false;
     clearTimeout(this._toastTimer);
-    this._toastTimer = setTimeout(() => (el.hidden = true), 6000);
+    this._toastTimer = setTimeout(() => (el.hidden = true), ms);
   }
 
   /** Runs a write; HA's error text goes to the toast. Returns the result, or undefined when it failed. */
@@ -767,6 +917,7 @@ class BeitScheduleCard extends BeitCardBase {
       this._loadWeeks();
     } else if (this._weeksSig !== this._scheduleSig()) this._loadWeeks();
     this._render();
+    this._editor?.onHass();
   }
 
   get hass() {
@@ -835,7 +986,7 @@ class BeitScheduleCard extends BeitCardBase {
     const t = this._t;
     const root = this._root();
     if (!root.querySelector('ha-card')) {
-      root.innerHTML = `<style>${BASE_STYLE}${SCHEDULE_STYLE}</style><ha-card><div class="body"></div></ha-card><div class="toast" hidden role="status"></div>`;
+      root.innerHTML = `<style>${BASE_STYLE}${SCHEDULE_STYLE}${EDITOR_STYLE}</style><ha-card><div class="body"></div></ha-card><div class="toast" hidden role="status"></div>`;
       root.addEventListener('click', (e) => this._onClick(e));
       root.addEventListener('keydown', (e) => {
         if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('.row[data-id]')) {
@@ -890,10 +1041,563 @@ class BeitScheduleCard extends BeitCardBase {
     if (row) this._openEditor(row.dataset.id);
   }
 
-  _openEditor(_entityId) {
-    // The editor dialog comes next.
+  _openEditor(entityId) {
+    if (!this._isAdmin || this._editor) return;
+    if (entityId && !this._weeks?.[entityId.slice('schedule.'.length)]) return;
+    this._editor = new ScheduleEditor(this, entityId);
+    this._editor.open();
+  }
+
+  /** After a write: fresh weeks and labels, whatever the entity states say. */
+  _afterWrite() {
+    this._loadWeeks();
+    this._loadLabels();
+  }
+
+  /** Areas, devices and the entity registry, for the device picker; read once per card. */
+  async _pickerData() {
+    this._pickerCache ??= Promise.all([
+      this._h.callWS({ type: 'config/area_registry/list' }),
+      this._h.callWS({ type: 'config/device_registry/list' }),
+      this._h.callWS({ type: 'config/entity_registry/list_for_display' }),
+    ]).then(([areas, devices, display]) => ({ areas, devices, display }));
+    try {
+      return await this._pickerCache;
+    } catch (err) {
+      this._pickerCache = null;
+      throw err;
+    }
   }
 }
+
+// ---------------------------------------------------------------------------- the editor dialog
+
+const toMinutes = (v) => {
+  const [h, m] = String(v || '').split(':').map((x) => parseInt(x, 10));
+  return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null;
+};
+
+/** Create a schedule for a device, or edit the week of an existing one. Lives in a <dialog> in the card's shadow root. */
+class ScheduleEditor {
+  constructor(card, entityId) {
+    this.card = card;
+    this.entityId = entityId; // null = a new schedule
+    this.isNew = !entityId;
+    this.id = entityId ? entityId.slice('schedule.'.length) : null;
+    this.week = entityId ? card._weeks[this.id].clone() : new WeekSchedule({ name: '' });
+    this.mode = entityId ? card._modeOf(entityId) : null;
+    this.originalMode = this.mode;
+    this.view = 'main'; // 'picker' | 'confirmDelete'
+    this.device = null;
+    this.hvacMode = null;
+    this.temperature = null;
+    this.brightness = null;
+    this.turnOffAtEnd = true;
+    this.automations = null; // existing schedule: the automations it drives
+    this.rangeEdit = null; // {day, index}
+    this.copyFrom = null; // {day, chosen: Set}
+    this.query = '';
+    this.picker = null;
+    this.saving = false;
+    this.error = '';
+  }
+
+  get t() {
+    return this.card._t;
+  }
+
+  get lang() {
+    return this.card._lang;
+  }
+
+  open() {
+    const root = this.card._root();
+    const dlg = document.createElement('dialog');
+    dlg.className = 'editor';
+    dlg.setAttribute('aria-labelledby', 'dlg-title');
+    root.appendChild(dlg);
+    this.dlg = dlg;
+    dlg.addEventListener('click', (e) => this.onClick(e));
+    dlg.addEventListener('change', (e) => this.onChange(e));
+    dlg.addEventListener('input', (e) => this.onInput(e));
+    dlg.addEventListener('cancel', (e) => {
+      e.preventDefault();
+      this.back();
+    });
+    dlg.addEventListener('close', () => this.destroy());
+    this.render();
+    dlg.showModal();
+    if (this.isNew) {
+      this.card._pickerData().then((d) => { this.picker = d; if (this.view === 'picker') this.render(); }, (err) => { this.error = errorText(err); this.render(); });
+    } else {
+      automationsFor(this.card._h, this.entityId).then(
+        (a) => { this.automations = a; this.renderLinked(); },
+        () => { this.automations = []; this.renderLinked(); },
+      );
+    }
+  }
+
+  close() {
+    if (this.dlg?.open) this.dlg.close();
+    else this.destroy();
+  }
+
+  destroy() {
+    this.dlg?.remove();
+    if (this.card._editor === this) this.card._editor = null;
+  }
+
+  /** Escape or the back arrow: leave a sub-view first, then the dialog. */
+  back() {
+    if (this.saving) return;
+    if (this.view !== 'main') {
+      this.view = 'main';
+      this.render();
+    } else if (this.rangeEdit || this.copyFrom) {
+      this.rangeEdit = this.copyFrom = null;
+      this.render();
+    } else this.close();
+  }
+
+  onHass() {
+    if (this.view === 'main' && !this.isNew) this.renderLinked();
+  }
+
+  // ---- rendering ----
+
+  render() {
+    if (!this.dlg) return;
+    const t = this.t;
+    const root = this.card._root();
+    const focusKey = root.activeElement?.dataset?.focus;
+    const scroller = this.dlg.querySelector('.dlg-body');
+    const scrollTop = scroller?.scrollTop ?? 0;
+    this.dlg.setAttribute('dir', this.card._dirAttr());
+    const title = this.view === 'picker' ? t.chooseDevice : this.isNew ? t.newSchedule : t.editSchedule;
+    const head = this.view === 'main'
+      ? `<button class="icon-btn" data-act="close" aria-label="${esc(t.close)}" data-focus="close">${icon('close')}</button>
+         <h3 id="dlg-title">${esc(title)}</h3>
+         ${this.isNew ? '' : `<button class="icon-btn" data-act="askDelete" aria-label="${esc(t.delete)}" title="${esc(t.delete)}" ${this.saving ? 'disabled' : ''}>${icon('delete')}</button>`}
+         <button class="btn primary" data-act="save" ${this.saving ? 'disabled' : ''}>${this.saving ? '<span class="spinner"></span>' : ''}${esc(t.save)}</button>`
+      : `<button class="icon-btn" data-act="back" aria-label="${esc(t.back)}" data-focus="back">${icon('back', 'flip')}</button><h3 id="dlg-title">${esc(this.view === 'picker' ? title : t.deleteQ)}</h3>`;
+    const body = this.view === 'picker' ? this.pickerHtml() : this.view === 'confirmDelete' ? this.confirmHtml() : this.mainHtml();
+    this.dlg.innerHTML = `<div class="dlg-head">${head}</div><div class="dlg-body">${body}</div>`;
+    const again = this.dlg.querySelector('.dlg-body');
+    if (this.view === 'main') again.scrollTop = scrollTop;
+    const focus = (focusKey && this.dlg.querySelector(`[data-focus="${focusKey}"]`)) || this.dlg.querySelector('[data-autofocus]');
+    focus?.focus();
+  }
+
+  mainHtml() {
+    const t = this.t;
+    const seg = [[null, t.regular, ''], ...MODES.map((m) => [m, t.modeName[m], MODE_GLYPH[m]])];
+    return `
+      ${this.error ? `<div class="error" role="alert">${icon('alert')}<span>${esc(this.error)}</span></div>` : ''}
+      <label class="field"><span>${esc(t.name)}</span>
+        <input id="name" data-focus="name" value="${esc(this.week.name)}" autocomplete="off" ${this.isNew ? '' : ''}></label>
+      <div class="section">
+        <div class="label">${esc(t.type)}</div>
+        <div class="seg" role="radiogroup" aria-label="${esc(t.type)}">
+          ${seg.map(([m, label, glyph]) => `<button role="radio" aria-checked="${this.mode === m}" data-act="mode" data-mode="${esc(m ?? '')}"
+            data-focus="mode-${esc(m ?? '')}">${glyph ? `<span aria-hidden="true">${glyph}</span>` : ''}${esc(label)}</button>`).join('')}
+        </div>
+        ${this.mode ? `<div class="muted small">${esc(t.modeHint(t.modeName[this.mode]))}</div>` : ''}
+      </div>
+      ${this.isNew ? this.targetHtml() : `<div class="section linked">${this.linkedHtml()}</div>`}
+      <div class="section">
+        <div class="label row-between"><span>${esc(t.hours)}</span>
+          <button class="link" data-act="clear" data-focus="clear">${esc(t.clearAll)}</button></div>
+        <div class="muted small">${esc(t.midnightHint)}</div>
+        <div class="days">${DAYS.map((_, i) => this.dayHtml(i)).join('')}</div>
+      </div>`;
+  }
+
+  targetHtml() {
+    const t = this.t;
+    const d = this.device;
+    let options = '';
+    if (d) {
+      const o = actionOptions(d);
+      if (o.hvacModes.length) {
+        options += `<div class="label">${esc(t.whileActive)}</div><div class="chips" role="radiogroup" aria-label="${esc(t.whileActive)}">
+          ${o.hvacModes.map((m) => `<button class="choice" role="radio" aria-checked="${this.hvacMode === m}" data-act="hvac" data-v="${esc(m)}"
+            data-focus="hvac-${esc(m)}">${esc(t.hvac[m] || m)}</button>`).join('')}</div>`;
+      }
+      if (o.temp) {
+        options += `<div class="opt"><label class="check"><input type="checkbox" data-field="useTemp" data-focus="useTemp" ${this.temperature != null ? 'checked' : ''}>
+          <span>${esc(t.setTemp)}</span></label>
+          ${this.temperature != null ? `<span class="stepper" dir="ltr">
+            <button class="icon-btn" data-act="temp" data-v="-1" aria-label="−" data-focus="temp-">${icon('minus')}</button>
+            <b aria-live="polite">${esc(this.temperature)}°</b>
+            <button class="icon-btn" data-act="temp" data-v="1" aria-label="+" data-focus="temp+">${icon('plus')}</button></span>` : ''}</div>`;
+      }
+      if (o.brightness) {
+        options += `<div class="opt"><label class="check"><input type="checkbox" data-field="useBrightness" data-focus="useBrightness" ${this.brightness != null ? 'checked' : ''}>
+          <span>${esc(t.brightness)}</span></label>
+          ${this.brightness != null ? `<input type="range" min="1" max="100" value="${this.brightness}" data-field="brightness" data-focus="brightness"
+            aria-label="${esc(t.brightness)}"><b class="bval">${this.brightness}%</b>` : ''}</div>`;
+      }
+      options += `<div class="opt"><span>${esc(o.domain === 'cover' ? t.closeAtEnd : t.turnOffAtEnd)}</span><span class="spacer"></span>
+        ${switchHtml({ checked: this.turnOffAtEnd, label: o.domain === 'cover' ? t.closeAtEnd : t.turnOffAtEnd, attrs: 'data-field="turnOff" data-focus="turnOff"' })}</div>`;
+    }
+    return `<div class="section">
+      <div class="label">${esc(t.device)}</div>
+      <button class="device" data-act="pick" data-focus="pick">
+        ${d ? `<span class="dname">${esc(entityName(d))}</span><span class="muted small" dir="ltr">${esc(d.entity_id)}</span><span class="spacer"></span><span class="link">${esc(t.changeDevice)}</span>`
+          : `${icon('plus')}<span>${esc(t.chooseDevice)}</span>`}
+      </button>
+      ${options}
+    </div>`;
+  }
+
+  linkedHtml() {
+    const t = this.t;
+    const autos = this.automations;
+    const states = this.card._hass.states;
+    let inner;
+    if (autos === null) inner = `<div class="muted small">${esc(t.loading)}</div>`;
+    else if (!autos.length) inner = `<div class="warn">${icon('alert')}<span>${esc(t.drivesNothing)}</span></div>`;
+    else {
+      inner = autos.map((a) => {
+        const on = states[a]?.state === 'on';
+        return `<div class="opt"><div class="grow"><div>${esc(entityName(states[a]) || a)}</div>
+          <div class="muted small">${esc(on ? t.autoOn : t.autoOff)}</div></div>
+          ${switchHtml({ checked: on, label: entityName(states[a]) || a, attrs: `data-field="auto" data-id="${esc(a)}" data-focus="auto-${esc(a)}"` })}</div>`;
+      }).join('');
+    }
+    return `<div class="label">${esc(t.drives)}</div>${inner}`;
+  }
+
+  renderLinked() {
+    const el = this.dlg?.querySelector('.linked');
+    if (!el) return;
+    const sig = JSON.stringify([this.automations, (this.automations || []).map((a) => this.card._hass.states[a]?.state)]);
+    if (sig === this._linkedSig) return;
+    this._linkedSig = sig;
+    const focusKey = this.card._root().activeElement?.dataset?.focus;
+    el.innerHTML = this.linkedHtml();
+    if (focusKey) el.querySelector(`[data-focus="${focusKey}"]`)?.focus();
+  }
+
+  dayHtml(i) {
+    const t = this.t;
+    const name = DAY_NAMES[this.lang][i];
+    const blocks = this.week.days[DAYS[i]];
+    const chips = blocks.map((b, k) => `<span class="range"><button data-act="edit" data-day="${i}" data-index="${k}" dir="ltr"
+        aria-label="${esc(`${t.editRange} ${name} ${blockLabel(b)}`)}" data-focus="edit-${i}-${k}">${esc(blockLabel(b))}</button><button
+        class="x" data-act="remove" data-day="${i}" data-index="${k}" aria-label="${esc(`${t.removeRange} ${blockLabel(b)}`)}">${icon('close')}</button></span>`).join('');
+    let panel = '';
+    if (this.rangeEdit?.day === i) {
+      const b = this.rangeEdit.index != null ? blocks[this.rangeEdit.index] : { start: 8 * 60, end: 9 * 60 };
+      panel = `<div class="panel" role="group" aria-label="${esc(t.editRange)}">
+        <div class="times" dir="ltr">
+          <label><span>${esc(t.from)}</span><input type="time" step="60" id="from" value="${hm(b.start)}" data-autofocus></label>
+          <span aria-hidden="true">–</span>
+          <label><span>${esc(t.to)}</span><input type="time" step="60" id="to" value="${b.end === 1440 ? '00:00' : hm(b.end)}"></label>
+        </div>
+        ${this.rangeEdit.error ? `<div class="error small" role="alert">${esc(this.rangeEdit.error)}</div>` : ''}
+        <div class="actions"><button class="btn" data-act="rangeCancel">${esc(t.cancel)}</button><button class="btn primary" data-act="rangeOk">${esc(t.ok)}</button></div>
+      </div>`;
+    } else if (this.copyFrom?.day === i) {
+      const chosen = this.copyFrom.chosen;
+      panel = `<div class="panel" role="group" aria-label="${esc(t.copyTo(name))}">
+        <div class="label">${esc(t.copyTo(name))}</div>
+        <div class="chips"><button class="choice" data-act="copyPreset" data-v="weekdays" data-autofocus>${esc(t.weekdays)}</button>
+          <button class="choice" data-act="copyPreset" data-v="week">${esc(t.wholeWeek)}</button></div>
+        <div class="copy-days">${DAYS.map((_, k) => (k === i ? '' : `<label class="check"><input type="checkbox" data-field="copyDay" data-v="${k}" ${chosen.has(k) ? 'checked' : ''}>
+          <span>${esc(DAY_NAMES[this.lang][k])}</span></label>`)).join('')}</div>
+        <div class="actions"><button class="btn" data-act="copyCancel">${esc(t.cancel)}</button><button class="btn primary" data-act="copyOk">${esc(t.copy)}</button></div>
+      </div>`;
+    }
+    return `<div class="day">
+      <div class="day-line">
+        <span class="dname">${esc(name)}</span>
+        <div class="ranges">${chips}<button class="add" data-act="add" data-day="${i}" data-focus="add-${i}" aria-label="${esc(`${t.addRange} ${name}`)}">${icon('plus')}<span>${esc(t.addRange)}</span></button></div>
+        ${blocks.length ? `<button class="icon-btn" data-act="copyOpen" data-day="${i}" aria-label="${esc(`${t.copyDays} (${name})`)}" title="${esc(t.copyDays)}" data-focus="copy-${i}">${icon('copy')}</button>` : '<span class="icon-space"></span>'}
+      </div>
+      ${panel}
+    </div>`;
+  }
+
+  pickerHtml() {
+    const t = this.t;
+    if (!this.picker) return `<div class="muted">${esc(t.loading)}</div>`;
+    return `<label class="search">${icon('search')}<input type="search" id="q" data-focus="q" data-autofocus placeholder="${esc(t.searchDevice)}"
+      aria-label="${esc(t.searchDevice)}" value="${esc(this.query)}"></label><div class="picker-list">${this.pickerListHtml()}</div>`;
+  }
+
+  pickerListHtml() {
+    const t = this.t;
+    const sections = deviceSections({ states: this.card._hass.states, ...this.picker }, this.query, t.noArea, this.lang);
+    if (!sections.length) return `<div class="muted">${esc(t.noDevices)}</div>`;
+    return sections.map((sec) => `<div class="area">${esc(sec.title)}</div>${sec.entities.map((e) => `
+      <button class="pick" data-act="choose" data-id="${esc(e.entity_id)}"><span class="grow">${esc(entityName(e))}</span>
+        <span class="muted small" dir="ltr">${esc(e.entity_id)}</span></button>`).join('')}`).join('');
+  }
+
+  confirmHtml() {
+    const t = this.t;
+    return `<p>${esc(t.deleteText)}</p>
+      ${this.error ? `<div class="error" role="alert">${icon('alert')}<span>${esc(this.error)}</span></div>` : ''}
+      <div class="actions"><button class="btn" data-act="back" ${this.saving ? 'disabled' : ''}>${esc(t.cancel)}</button>
+        <button class="btn primary danger-fill" data-act="doDelete" data-autofocus ${this.saving ? 'disabled' : ''}>${this.saving ? '<span class="spinner"></span>' : ''}${esc(t.delete)}</button></div>`;
+  }
+
+  // ---- events ----
+
+  onClick(e) {
+    if (e.target === this.dlg) return; // the backdrop: keep what was typed
+    const el = e.target.closest('[data-act]');
+    if (!el || el.disabled) return;
+    const act = el.dataset.act;
+    const day = el.dataset.day != null ? Number(el.dataset.day) : null;
+    const index = el.dataset.index != null ? Number(el.dataset.index) : null;
+    const w = this.week;
+    switch (act) {
+      case 'close': return this.close();
+      case 'back': return this.back();
+      case 'save': return this.save();
+      case 'askDelete': this.view = 'confirmDelete'; this.error = ''; break;
+      case 'doDelete': return this.remove();
+      case 'mode': this.mode = el.dataset.mode || null; break;
+      case 'pick': this.view = 'picker'; this.query = ''; break;
+      case 'choose': {
+        const d = this.card._hass.states[el.dataset.id];
+        if (!d) return;
+        this.device = d;
+        const o = actionOptions(d);
+        this.hvacMode = o.defaultHvac;
+        this.temperature = null;
+        this.brightness = null;
+        if (!this.nameInput().trim()) this.week.name = entityName(d);
+        this.view = 'main';
+        break;
+      }
+      case 'hvac': this.hvacMode = el.dataset.v; break;
+      case 'temp': {
+        const o = actionOptions(this.device);
+        this.temperature = Math.min(o.temp.max, Math.max(o.temp.min, Math.round(this.temperature + Number(el.dataset.v))));
+        break;
+      }
+      case 'clear': for (const d of DAYS) w.days[d] = []; this.rangeEdit = this.copyFrom = null; break;
+      case 'add': this.rangeEdit = { day, index: null }; this.copyFrom = null; break;
+      case 'edit': this.rangeEdit = { day, index }; this.copyFrom = null; break;
+      case 'remove': w.days[DAYS[day]] = w.days[DAYS[day]].filter((_, k) => k !== index); this.rangeEdit = null; break;
+      case 'rangeCancel': this.rangeEdit = null; break;
+      case 'rangeOk': {
+        const start = toMinutes(this.dlg.querySelector('#from').value);
+        let end = toMinutes(this.dlg.querySelector('#to').value);
+        if (end === 0) end = 1440; // "until midnight"
+        if (start == null || end == null || end <= start) {
+          this.rangeEdit.error = this.t.errRange;
+          break;
+        }
+        const d = DAYS[this.rangeEdit.day];
+        const next = w.days[d].filter((_, k) => k !== this.rangeEdit.index);
+        next.push({ start, end });
+        w.days[d] = next.sort(byStart);
+        this.rangeEdit = null;
+        break;
+      }
+      case 'copyOpen': this.copyFrom = { day, chosen: new Set() }; this.rangeEdit = null; break;
+      case 'copyPreset': for (const k of el.dataset.v === 'weekdays' ? [0, 1, 2, 3, 4] : [0, 1, 2, 3, 4, 5, 6]) this.copyFrom.chosen.add(k); break;
+      case 'copyCancel': this.copyFrom = null; break;
+      case 'copyOk': {
+        const from = w.days[DAYS[this.copyFrom.day]];
+        for (const k of this.copyFrom.chosen) if (k !== this.copyFrom.day) w.days[DAYS[k]] = from.map((b) => ({ ...b }));
+        this.copyFrom = null;
+        break;
+      }
+      default: return;
+    }
+    this.syncName();
+    this.render();
+  }
+
+  onChange(e) {
+    const f = e.target.dataset?.field;
+    if (!f) return;
+    if (f === 'auto') {
+      const id = e.target.dataset.id;
+      this.card._run(() => setAutomationEnabled(this.card._h, id, e.target.checked));
+      return;
+    }
+    if (f === 'copyDay') {
+      const k = Number(e.target.dataset.v);
+      e.target.checked ? this.copyFrom.chosen.add(k) : this.copyFrom.chosen.delete(k);
+      return;
+    }
+    if (f === 'useTemp') this.temperature = e.target.checked ? actionOptions(this.device).temp.initial : null;
+    else if (f === 'useBrightness') this.brightness = e.target.checked ? 80 : null;
+    else if (f === 'turnOff') this.turnOffAtEnd = e.target.checked;
+    else if (f === 'brightness') this.brightness = Number(e.target.value);
+    else return;
+    this.syncName();
+    this.render();
+  }
+
+  onInput(e) {
+    if (e.target.id === 'name') this.week.name = e.target.value;
+    else if (e.target.id === 'q') {
+      this.query = e.target.value;
+      this.dlg.querySelector('.picker-list').innerHTML = this.pickerListHtml();
+    } else if (e.target.dataset?.field === 'brightness') {
+      this.brightness = Number(e.target.value);
+      const b = this.dlg.querySelector('.bval');
+      if (b) b.textContent = `${this.brightness}%`;
+    }
+  }
+
+  nameInput() {
+    return this.dlg.querySelector('#name')?.value ?? this.week.name;
+  }
+
+  syncName() {
+    const el = this.dlg?.querySelector('#name');
+    if (el) this.week.name = el.value;
+  }
+
+  // ---- writes ----
+
+  async save() {
+    const t = this.t;
+    this.syncName();
+    const problem = this.week.validate(this.lang) ?? (this.week.isEmpty ? t.errEmpty : null) ?? (this.isNew && !this.device ? t.errDevice : null);
+    if (problem) {
+      this.error = problem;
+      this.render();
+      this.dlg.querySelector('.dlg-body').scrollTop = 0;
+      return;
+    }
+    this.error = '';
+    this.saving = true;
+    this.rangeEdit = this.copyFrom = null;
+    this.render();
+    const h = this.card._h;
+    try {
+      if (this.isNew) {
+        const d = this.device;
+        const climate = domainOf(d.entity_id) === 'climate';
+        await createScheduleWithAutomation(h, this.week, {
+          entityId: d.entity_id,
+          name: entityName(d),
+          hvacMode: climate ? this.hvacMode : null,
+          temperature: this.temperature,
+          brightnessPct: this.brightness,
+          turnOffAtEnd: this.turnOffAtEnd,
+        }, { labelName: this.mode });
+      } else {
+        await updateSchedule(h, this.id, this.week);
+        // Only when the user changed it: the automations may carry a mode the schedule itself does not.
+        if (this.mode !== this.originalMode) {
+          const ids = [this.entityId, ...(this.automations || [])];
+          const reg = await loadRegistry(h);
+          for (const m of MODES) {
+            if (this.mode === m) await setModeMembership(h, m, ids, true);
+            else if (labelNamed(reg, m)) await setModeMembership(h, m, ids, false);
+          }
+        }
+      }
+      this.card._afterWrite();
+      this.close();
+    } catch (err) {
+      this.saving = false;
+      this.error = t.saveFailed(errorText(err));
+      this.render();
+      this.dlg.querySelector('.dlg-body').scrollTop = 0;
+    }
+  }
+
+  async remove() {
+    const t = this.t;
+    this.saving = true;
+    this.render();
+    try {
+      const kept = await deleteSchedule(this.card._h, this.entityId);
+      this.card._afterWrite();
+      this.close();
+      if (kept.length) this.card._toast(t.kept(kept.join(', ')), 12000);
+    } catch (err) {
+      this.saving = false;
+      this.error = t.deleteFailed(errorText(err));
+      this.render();
+    }
+  }
+}
+
+const EDITOR_STYLE = `
+  dialog.editor { padding: 0; border: 0; border-radius: var(--ha-card-border-radius, 12px); width: min(640px, calc(100vw - 32px));
+    max-height: calc(100vh - 48px); background: var(--card-background-color, #fff); color: var(--primary-text-color);
+    box-shadow: 0 8px 32px rgba(0,0,0,.35); overflow: hidden; }
+  dialog.editor[open] { display: flex; flex-direction: column; }
+  dialog.editor::backdrop { background: rgba(0,0,0,.5); }
+  @media (max-width: 600px) {
+    dialog.editor { width: 100vw; max-width: 100vw; height: 100vh; height: 100dvh; max-height: 100dvh; border-radius: 0; margin: 0; }
+  }
+  .dlg-head { display: flex; align-items: center; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--divider-color); flex: none; }
+  .dlg-head h3 { flex: 1; margin: 0 4px; font-size: 18px; font-weight: 500; }
+  .dlg-body { overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 18px; overscroll-behavior: contain; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field span, .label { font-size: 13px; color: var(--secondary-text-color); font-weight: 500; }
+  .field input, .search input, .times input { font: inherit; color: inherit; padding: 9px 12px; border-radius: 8px;
+    border: 1px solid var(--divider-color); background: var(--secondary-background-color, transparent); }
+  .field input { font-size: 16px; }
+  .section { display: flex; flex-direction: column; gap: 8px; }
+  .row-between { display: flex; align-items: center; justify-content: space-between; }
+  .link { font: inherit; font-size: 13px; color: var(--primary-color); background: none; border: 0; padding: 0; cursor: pointer; }
+  .seg { display: inline-flex; align-self: flex-start; border: 1px solid var(--divider-color); border-radius: 18px; overflow: hidden; }
+  .seg button { display: inline-flex; gap: 4px; align-items: center; padding: 7px 16px; border: 0; background: transparent; cursor: pointer; font-size: 14px; }
+  .seg button + button { border-inline-start: 1px solid var(--divider-color); }
+  .seg button[aria-checked="true"] { background: color-mix(in srgb, var(--primary-color) 20%, transparent); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .choice { padding: 6px 14px; border-radius: 16px; border: 1px solid var(--divider-color); background: transparent; cursor: pointer; font-size: 14px; }
+  .choice[aria-checked="true"] { background: color-mix(in srgb, var(--primary-color) 20%, transparent); border-color: var(--primary-color); font-weight: 600; }
+  .device { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; border-radius: 8px; cursor: pointer; text-align: start;
+    border: 1px dashed var(--divider-color); background: transparent; color: var(--primary-color); font-size: 14px; }
+  .device .dname { color: var(--primary-text-color); font-weight: 500; }
+  .opt { display: flex; align-items: center; gap: 8px; min-height: 40px; }
+  .opt input[type=range] { flex: 1; accent-color: var(--primary-color); }
+  .grow, .spacer { flex: 1; min-width: 0; }
+  .check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  .check input { width: 18px; height: 18px; accent-color: var(--primary-color); margin: 0; }
+  .stepper { display: inline-flex; align-items: center; gap: 2px; margin-inline-start: auto; }
+  .stepper b { min-width: 40px; text-align: center; font-size: 16px; }
+  .warn, .error { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 8px; font-size: 14px; }
+  .warn { background: color-mix(in srgb, var(--warning-color, #ffa600) 16%, transparent); }
+  .error { background: color-mix(in srgb, var(--error-color, #db4437) 14%, transparent); color: var(--error-color, #db4437); }
+  .error.small { padding: 4px 8px; font-size: 13px; }
+  .days { display: flex; flex-direction: column; }
+  .day { border-bottom: 1px solid var(--divider-color); padding: 6px 0; }
+  .day:last-child { border-bottom: 0; }
+  .day-line { display: flex; align-items: center; gap: 8px; }
+  .day-line .dname { width: 52px; flex: none; font-size: 14px; }
+  .ranges { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+  .range { display: inline-flex; align-items: center; border-radius: 16px; background: color-mix(in srgb, var(--primary-color) 16%, transparent); }
+  .range button { border: 0; background: transparent; cursor: pointer; padding: 5px 4px 5px 12px; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .range .x { padding: 4px 8px 4px 2px; display: inline-flex; color: var(--secondary-text-color); }
+  .range .x .ic { width: 16px; height: 16px; }
+  .add { display: inline-flex; align-items: center; gap: 2px; padding: 4px 10px 4px 6px; border-radius: 16px; font-size: 13px; cursor: pointer;
+    border: 1px dashed var(--divider-color); background: transparent; color: var(--primary-color); }
+  .add .ic { width: 16px; height: 16px; }
+  .icon-space { width: 36px; flex: none; }
+  .panel { margin: 8px 0 4px; padding: 12px; border-radius: 10px; background: var(--secondary-background-color, rgba(127,127,127,.1));
+    display: flex; flex-direction: column; gap: 10px; }
+  .times { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+  .times label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--secondary-text-color); }
+  .times input { font-size: 16px; color: var(--primary-text-color); background: var(--card-background-color); }
+  .actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .copy-days { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+  .search { display: flex; align-items: center; gap: 8px; position: sticky; top: -16px; background: var(--card-background-color); padding: 4px 0 8px; z-index: 1; }
+  .search input { flex: 1; font-size: 16px; }
+  .search .ic { color: var(--secondary-text-color); }
+  .picker-list { display: flex; flex-direction: column; }
+  .area { font-size: 13px; font-weight: 600; color: var(--secondary-text-color); padding: 12px 4px 4px; }
+  .pick { display: flex; align-items: center; gap: 8px; padding: 10px 8px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; text-align: start; font-size: 15px; }
+  .pick:hover { background: color-mix(in srgb, var(--primary-color) 8%, transparent); }
+  .btn.danger-fill, .btn.danger-fill:hover { background: var(--error-color, #db4437); border-color: var(--error-color, #db4437); }
+  .spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+`;
 
 /** Seven thin bars, one per day, Sunday first; the time axis always runs left to right. */
 function weekBarsHtml(week, lang) {
