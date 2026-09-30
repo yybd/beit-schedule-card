@@ -21,3 +21,15 @@ jobs:
         with:
           node-version: 22
       - run: node --test 'tests/*.test.mjs'
+
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Chrome is on GitHub's runners; the script starts dev/serve.py itself.
+      - run: node dev/ui-test.mjs
+        env:
+          CHROME: google-chrome

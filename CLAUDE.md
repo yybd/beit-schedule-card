@@ -21,5 +21,7 @@ A Home Assistant dashboard plugin (HACS, category *Dashboard*): `dist/beit-sched
 
 ```bash
 node --test 'tests/*.test.mjs'          # unit + fake-hass tests
+node dev/ui-test.mjs                    # the cards in headless Chrome, clicked through (starts dev/serve.py)
+node dev/screenshots.mjs                # the README screenshots, in English, from the offline preview
 python3 dev/serve.py        # preview at http://localhost:8766 (offline fake hass; ?live=1 for a real HA)
 ```
