@@ -18,7 +18,7 @@ const FAST = { waitOptions: { tries: 20, every: 5 } };
 
 const week = (name, days) => new WeekSchedule({ name, days });
 const writes = (hass) => hass.calls.filter((c) => !['schedule/list', 'search/related', 'automation/config', 'config/label_registry/list',
-  'config/entity_registry/list_for_display', 'config/area_registry/list', 'config/device_registry/list'].includes(c.type) && c.method !== 'GET');
+  'config/entity_registry/list_for_display', 'config/area_registry/list', 'config/device_registry/list', 'config/entity_registry/get'].includes(c.type) && c.method !== 'GET');
 
 // ---- schedules -----------------------------------------------------------------------------------------------------
 
@@ -431,4 +431,67 @@ test('readSchedules reads UI and YAML weeks through get_schedule, which non-admi
   const call = hass.calls.at(-1);
   assert.deepEqual([call.domain, call.service, call.target], ['schedule', 'get_schedule', { entity_id: ['schedule.pool_pump', 'schedule.balcony_light'] }]);
   assert.deepEqual(await readSchedules(hass, []), {});
+});
+
+// ---- found in the pre-release review ---------------------------------------------------------------------------
+
+import { schedulesIn, alignWithMode, scheduleIdsOf } from '../dist/beit-schedule-card.js';
+
+test('an alias the user changed survives a rewrite of what the schedule does', async () => {
+  const hass = house();
+  const cfg = { ...fixtures.automation_configs['automation.beit_bedroom_ac_shabbat'], alias: 'Beit · My bedroom AC' };
+  const target = { ...parseScheduleAutomation(cfg).target, temperature: 21 };
+  await rewriteScheduleAutomation(hass, cfg, { target });
+  assert.equal(hass.calls.find((c) => c.method === 'POST').body.alias, 'Beit · My bedroom AC');
+});
+
+test('schedulesIn keeps only schedule entities, not schedule actions', () => {
+  const cfg = { actions: [{ action: 'schedule.reload' }, { action: 'schedule.get_schedule', target: { entity_id: 'schedule.balcony_light' } }] };
+  assert.deepEqual(schedulesIn(cfg, house().states), ['schedule.balcony_light']);
+});
+
+test('labelling reads each entity from the registry, keeping its other labels', async () => {
+  const hass = house();
+  await setModeMembership(hass, 'שבת', ['schedule.water_heater_weekdays'], true);
+  assert.equal(hass.calls.filter((c) => c.type === 'config/entity_registry/get').length, 1);
+  assert.deepEqual(hass.calls.find((c) => c.type === 'config/entity_registry/update').labels, ['energy', 'shbt']);
+  // Taking a mode away that does not exist creates nothing.
+  const bare = new FakeHass({ ...fixtures, label_registry: [] }, { now: SUNDAY_9AM });
+  assert.equal(await setModeMembership(bare, 'שבת', ['schedule.water_heater_weekdays'], false), null);
+  assert.ok(!bare.calls.some((c) => c.type === 'config/label_registry/create'));
+});
+
+test('joining a mode follows its state; leaving every mode switches the automation on', async () => {
+  const hass = house();
+  // Chag mode is off (its only member is off): an automation joining it is switched off.
+  await alignWithMode(hass, 'חג', ['automation.beit_water_heater_weekdays']);
+  assert.equal(hass.states['automation.beit_water_heater_weekdays'].state, 'off');
+  // Out of every mode: it runs every week again.
+  await alignWithMode(hass, null, ['automation.beit_water_heater_weekdays']);
+  assert.equal(hass.states['automation.beit_water_heater_weekdays'].state, 'on');
+  // Shabbat is partly on: nothing to follow.
+  await alignWithMode(hass, 'שבת', ['automation.beit_water_heater_weekdays']);
+  assert.equal(hass.states['automation.beit_water_heater_weekdays'].state, 'on');
+});
+
+test('the automatic automation is found by its label and marker even when renamed', async () => {
+  const hass = house();
+  const id = await enableAuto(hass, 'שבת', FAST);
+  // The user renames it in HA.
+  hass._states[id] = { ...hass.states[id], attributes: { ...hass.states[id].attributes, friendly_name: 'My Shabbat' } };
+  assert.equal((await findAuto(hass, 'שבת'))?.entityId, id);
+  await enableAuto(hass, 'שבת', FAST);
+  assert.equal(hass.calls.filter((c) => c.method === 'POST').length, 1, 'never a second');
+});
+
+test('a renamed schedule entity keeps its helper id', async () => {
+  const hass = house();
+  hass._scheduleIds = { 'schedule.balcony_light': 'balcony_light' };
+  assert.deepEqual(await scheduleIdsOf(hass, ['schedule.balcony_light', 'schedule.nope']), { 'schedule.balcony_light': 'balcony_light' });
+});
+
+test('per-block data survives a round trip', () => {
+  const w = WeekSchedule.fromHA({ name: 'n', monday: [{ from: '07:00:00', to: '08:00:00', data: { mode: 'eco' } }] });
+  assert.deepEqual(w.toHA().monday, [{ from: '07:00:00', to: '08:00:00', data: { mode: 'eco' } }]);
+  assert.deepEqual(w.clone().toHA().monday[0].data, { mode: 'eco' });
 });

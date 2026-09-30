@@ -18,7 +18,10 @@ marker), `test/schedule_test.dart` (cases to port 1:1), `lib/store/home_store.da
 - Blocks within a day must not overlap, and `to > from`. HA rejects the write otherwise.
 - Reading a week without editing it: the `schedule.get_schedule` action with `return_response`. Unlike
   `schedule/list` it is open to non-admins and covers YAML schedules too.
-- `schedule/create` generates the id as a slug of the name. The entity is `schedule.<id>`.
+- `schedule/create` generates the id as a slug of the name. The entity is usually `schedule.<id>`, or `schedule.<id>_2`
+  when that entity id is taken; the entity's registry `unique_id` is the helper id, so resolve it from there
+  (`config/entity_registry/get`). A user may rename the entity.
+- A block may carry an extra `data` object; keep it on every write.
 - `schedule/update` takes the full body: `schedule_id`, `name` and all seven days.
 
 ## 2. The automation a schedule drives
@@ -74,7 +77,10 @@ Written with `POST /api/config/automation/config/<id>`. From a card this is `has
 
 - **A mode is an HA label.** Labels are identified by **name**, `שבת` and `חג`, never by id. HA slugs Hebrew names (for example `shbt`), and the slug is not guaranteed.
 - **Creating a missing label:** `config/label_registry/create {name, icon: "mdi:candle" | "mdi:star-david", color: "amber" | "indigo"}`.
-- **Membership:** an automation, and the schedules it follows, carry the label. Write it with `config/entity_registry/update {entity_id, labels: [...]}`. That call **replaces** the list, so merge with the existing labels, which you read from `config/entity_registry/list_for_display` → `lb`.
+- **Membership:** an automation, and the schedules it follows, carry the label. Write it with `config/entity_registry/update {entity_id, labels: [...]}`. That call **replaces** the list, so merge with the entity's existing labels, read just before from `config/entity_registry/get` → `labels` (`list_for_display` leaves out disabled entities).
+- **Changing a schedule's mode from the schedule editor** moves the schedule and only the automations carrying the
+  marker that drive it; an automation the user wrote may only mention the schedule. Those automations then follow the
+  mode: joining a mode that is on or off switches them to match; leaving every mode switches them on.
 - **Taking an automation out of a mode** also takes out the schedules its config refers to, except those another
   automation of the mode still refers to.
 - **Switching a mode:** `automation.turn_on` / `automation.turn_off` with target `{label_id}`, or with the member list. The switch shows:
@@ -88,7 +94,8 @@ Written with `POST /api/config/automation/config/<id>`. From a card this is `has
     `weekday: [fri]` condition stays. Changing the start replaces only that trigger (and the description while it is
     still the one Beit wrote).
   - When Shabbat ends (see §4), it waits until every `schedule.*` carrying the label is off (6 h timeout), then turns the label off with `stop_actions: false`.
-  - The card creates it on request, and **recognises** an existing one by the marker and the alias, so there is never a second.
+  - The card creates it on request, and **recognises** an existing one, so there is never a second: by its alias, or, if
+    renamed, as an automation found by `search/related` for the label that carries the marker and an `erev_*` trigger.
   - Switching it off **disables** it (`automation.turn_off`). The card never deletes it, so changes the user made to it survive.
 - **Automatic chag.** The same shape with alias `Beit · מצב חג אוטומטי` and the `חג` label. Jewish Calendar only.
   - Start trigger `id: erev_chag`: a time of day, or an offset before `sensor.jewish_calendar_upcoming_candle_lighting*`.

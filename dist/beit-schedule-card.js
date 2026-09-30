@@ -67,14 +67,15 @@ export class WeekSchedule {
   constructor({ name = '', days = {} } = {}) {
     this.name = name;
     this.days = {};
-    for (const d of DAYS) this.days[d] = (days[d] || []).map((b) => ({ start: b.start, end: b.end }));
+    for (const d of DAYS) this.days[d] = (days[d] || []).map((b) => ({ ...b }));
   }
 
   /** From a `schedule/list` item (or anything with the seven day keys). */
   static fromHA(j) {
     const days = {};
     for (const d of DAYS) {
-      days[d] = (j?.[d] || []).map((b) => ({ start: parseBlock(b.from), end: parseBlock(b.to) })).sort(byStart);
+      // HA lets a block carry extra `data`; it rides along so an edit does not drop it.
+      days[d] = (j?.[d] || []).map((b) => ({ start: parseBlock(b.from), end: parseBlock(b.to), ...(b.data ? { data: b.data } : {}) })).sort(byStart);
     }
     return new WeekSchedule({ name: j?.name ?? '', days });
   }
@@ -82,7 +83,9 @@ export class WeekSchedule {
   /** The body HA's `schedule/create` and `schedule/update` expect (minus the id). Days go out Sunday first, sorted. */
   toHA() {
     const out = { name: this.name.trim() };
-    for (const d of DAYS) out[d] = [...this.days[d]].sort(byStart).map((b) => ({ from: formatBlock(b.start), to: formatBlock(b.end) }));
+    for (const d of DAYS) {
+      out[d] = [...this.days[d]].sort(byStart).map((b) => ({ from: formatBlock(b.start), to: formatBlock(b.end), ...(b.data ? { data: b.data } : {}) }));
+    }
     return out;
   }
 
@@ -222,8 +225,10 @@ export function parseScheduleAutomation(config) {
 }
 
 /** The schedule entities an automation config refers to. */
-export function schedulesIn(config) {
-  return [...new Set(JSON.stringify(config ?? {}).match(/schedule\.[a-z0-9_]+/g) || [])];
+export function schedulesIn(config, states = null) {
+  const ids = [...new Set(JSON.stringify(config ?? {}).match(/schedule\.[a-z0-9_]+/g) || [])];
+  // "schedule.reload" or "schedule.get_schedule" are actions, not entities: keep what HA has as a state.
+  return states ? ids.filter((id) => id in states) : ids;
 }
 
 // ---------------------------------------------------------------------------- modes
@@ -261,7 +266,7 @@ function pick(states, base) {
 export function findCalendar(states) {
   const s = states || {};
   const jc = (kind, suffix) => pick(s, `${kind}.jewish_calendar_${suffix}`);
-  const hc = (suffix) => (s[`sensor.hebcal_${suffix}`] ? `sensor.hebcal_${suffix}` : null);
+  const hc = (suffix) => pick(s, `sensor.hebcal_${suffix}`);
   const cal = {
     issur: jc('binary_sensor', 'issur_melacha_in_effect'),
     erev: jc('binary_sensor', 'erev_shabbat_hag'),
@@ -453,8 +458,9 @@ export function weekStatus(week, now = new Date()) {
   } else {
     delta = Math.min(...merged.map((r) => ((r[0] - t) % MINUTES_PER_WEEK + MINUTES_PER_WEEK) % MINUTES_PER_WEEK));
   }
-  const next = new Date(now.getTime() + delta * 60000);
+  const next = new Date(now);
   next.setSeconds(0, 0);
+  next.setMinutes(next.getMinutes() + Math.round(delta + now.getSeconds() / 60)); // local-time arithmetic: DST-safe
   return { on: !!on, next };
 }
 
@@ -477,6 +483,33 @@ export async function waitForEntity(hass, test, { tries = 40, every = 150 } = {}
     await sleep(every);
   }
   throw new Error('Home Assistant did not report the new entity');
+}
+
+/**
+ * The helper id behind each schedule entity: its registry unique_id. Usually `schedule.<id>`, but the user may have
+ * renamed the entity. `{entity_id: schedule_id}`.
+ */
+export async function scheduleIdsOf(hass, entityIds) {
+  const pairs = await Promise.all(entityIds.map(async (id) => {
+    const e = await hass.callWS({ type: 'config/entity_registry/get', entity_id: id }).catch(() => null);
+    return [id, e?.platform === 'schedule' && e.unique_id ? String(e.unique_id) : null];
+  }));
+  return Object.fromEntries(pairs.filter(([, u]) => u));
+}
+
+/** The entity HA made for a new schedule helper: `schedule.<id>`, or `schedule.<id>_2` when that id is taken. */
+async function scheduleEntityFor(hass, scheduleId, { tries = 40, every = 150 } = {}) {
+  const re = new RegExp(`^schedule\\.${scheduleId}(_\\d+)?$`);
+  for (let i = 0; i < tries; i++) {
+    const candidates = Object.keys(hass.states || {}).filter((id) => re.test(id));
+    if (candidates.length) {
+      const ids = await scheduleIdsOf(hass, candidates);
+      const hit = candidates.find((c) => ids[c] === scheduleId);
+      if (hit) return hit;
+    }
+    await sleep(every);
+  }
+  throw new Error('Home Assistant did not report the new schedule');
 }
 
 /** `{id: WeekSchedule}` for every UI-managed schedule. */
@@ -514,9 +547,9 @@ export async function automationConfig(hass, automationEntityId) {
  */
 export async function createScheduleWithAutomation(hass, week, target, { labelName = null, waitOptions } = {}) {
   const created = await hass.callWS({ type: 'schedule/create', ...week.toHA() });
-  const scheduleEntityId = `schedule.${created.id}`;
+  let scheduleEntityId;
   try {
-    await waitForEntity(hass, (e) => e.entity_id === scheduleEntityId, waitOptions);
+    scheduleEntityId = await scheduleEntityFor(hass, created.id, waitOptions);
   } catch (err) {
     await hass.callWS({ type: 'schedule/delete', schedule_id: created.id });
     throw err;
@@ -541,6 +574,7 @@ export async function createScheduleWithAutomation(hass, week, target, { labelNa
         waitOptions,
       );
       await setModeMembership(hass, labelName, [scheduleEntityId, automation.entity_id], true);
+      await alignWithMode(hass, labelName, [automation.entity_id]);
     } catch (err) {
       // The schedule and its automation exist: saving again would make a second pair.
       throw Object.assign(err instanceof Error ? err : new Error(errorText(err)), { created: scheduleEntityId });
@@ -553,14 +587,14 @@ export async function createScheduleWithAutomation(hass, week, target, { labelNa
  * Deletes a schedule and the automations driving it that Beit wrote. Automations written by hand are left alone;
  * their names are returned.
  */
-export async function deleteSchedule(hass, scheduleEntityId) {
+export async function deleteSchedule(hass, scheduleEntityId, scheduleId = scheduleEntityId.slice('schedule.'.length)) {
   const kept = [];
   for (const a of await automationsFor(hass, scheduleEntityId)) {
     const cfg = await automationConfig(hass, a);
     if (isOurs(cfg) && cfg?.id != null) await hass.callApi('DELETE', `config/automation/config/${cfg.id}`);
     else kept.push(hass.states?.[a]?.attributes?.friendly_name || a);
   }
-  await hass.callWS({ type: 'schedule/delete', schedule_id: scheduleEntityId.slice('schedule.'.length) });
+  await hass.callWS({ type: 'schedule/delete', schedule_id: scheduleId });
   return kept;
 }
 
@@ -627,10 +661,15 @@ export async function ensureLabel(hass, name) {
  * list, so the entity's other labels are merged back in.
  */
 export async function setModeMembership(hass, labelName, entityIds, member) {
-  const label = await ensureLabel(hass, labelName);
-  const { entityLabels } = await loadRegistry(hass);
+  const label = member
+    ? await ensureLabel(hass, labelName)
+    : (await hass.callWS({ type: 'config/label_registry/list' })).find((l) => l.name === labelName);
+  if (!label) return null; // nothing to take away
   for (const id of entityIds) {
-    const current = entityLabels[id] || [];
+    // The entity's own entry: list_for_display leaves out disabled entities, and a replaced list would lose labels.
+    const entry = await hass.callWS({ type: 'config/entity_registry/get', entity_id: id }).catch(() => null);
+    if (!entry) continue;
+    const current = entry.labels || [];
     const next = member ? [...new Set([...current, label.label_id])] : current.filter((l) => l !== label.label_id);
     if (next.length === current.length && next.every((l) => current.includes(l))) continue;
     await hass.callWS({ type: 'config/entity_registry/update', entity_id: id, labels: next });
@@ -643,13 +682,13 @@ export async function setModeMembership(hass, labelName, entityIds, member) {
  * leaves a schedule in the mode while another automation of the mode still follows it.
  */
 export async function setAutomationInMode(hass, labelName, automationId, member) {
-  const schedules = schedulesIn(await automationConfig(hass, automationId));
+  const schedules = schedulesIn(await automationConfig(hass, automationId), hass.states);
   if (member) return setModeMembership(hass, labelName, [automationId, ...schedules], true);
   const registry = await loadRegistry(hass);
   const stillUsed = new Set();
   for (const other of modeMembers(hass.states, registry, labelName)) {
     if (other.entity_id === automationId) continue;
-    for (const id of schedulesIn(await automationConfig(hass, other.entity_id).catch(() => null))) stillUsed.add(id);
+    for (const id of schedulesIn(await automationConfig(hass, other.entity_id).catch(() => null), hass.states)) stillUsed.add(id);
   }
   return setModeMembership(hass, labelName, [automationId, ...schedules.filter((id) => !stillUsed.has(id))], false);
 }
@@ -663,9 +702,28 @@ export function modeMembers(states, registry, labelName, domain = 'automation') 
     .sort((a, b) => entityName(a).localeCompare(entityName(b), 'he'));
 }
 
+/**
+ * After automations join a mode (or leave all modes, `labelName` null): they follow the mode's current state, so
+ * joining a mode that is off switches them off; leaving means they run every week again, so they are switched on.
+ */
+export async function alignWithMode(hass, labelName, automationIds) {
+  if (!automationIds.length) return;
+  let on = true;
+  if (labelName) {
+    const registry = await loadRegistry(hass);
+    const others = modeMembers(hass.states, registry, labelName)
+      .filter((m) => !automationIds.includes(m.entity_id) && !isAutoAlias(m.attributes?.friendly_name));
+    const state = modeState(others);
+    if (state !== 'on' && state !== 'off') return; // partial or empty: nothing to follow
+    on = state === 'on';
+  }
+  const change = automationIds.filter((id) => (hass.states?.[id]?.state === 'on') !== on);
+  if (change.length) await hass.callService('automation', on ? 'turn_on' : 'turn_off', {}, { entity_id: change });
+}
+
 /** Switches every automation of a mode on or off in one call. */
 export async function setModeEnabled(hass, registry, labelName, enabled) {
-  const members = modeMembers(hass.states, registry, labelName);
+  const members = modeMembers(hass.states, registry, labelName).filter((m) => !isAutoAlias(m.attributes?.friendly_name));
   if (!members.length) return;
   await hass.callService('automation', enabled ? 'turn_on' : 'turn_off', {}, { entity_id: members.map((m) => m.entity_id) });
 }
@@ -677,15 +735,24 @@ export async function setModeEnabled(hass, registry, labelName, enabled) {
  * carries the marker is preferred.
  */
 export async function findAuto(hass, mode) {
-  const candidates = Object.values(hass.states || {}).filter(
-    (e) => e.entity_id.startsWith('automation.') && e.attributes?.friendly_name === AUTO_ALIAS[mode],
-  );
+  const byAlias = Object.values(hass.states || {})
+    .filter((e) => e.entity_id.startsWith('automation.') && e.attributes?.friendly_name === AUTO_ALIAS[mode])
+    .map((e) => e.entity_id);
+  // Renamed in HA, it is still the automation that targets the mode's label: search finds those.
+  let byLabel = [];
+  try {
+    const label = (await hass.callWS({ type: 'config/label_registry/list' })).find((l) => l.name === mode);
+    if (label) byLabel = (await hass.callWS({ type: 'search/related', item_type: 'label', item_id: label.label_id }))?.automation || [];
+  } catch {
+    /* alias only */
+  }
   let fallback = null;
-  for (const c of candidates) {
-    const config = await automationConfig(hass, c.entity_id).catch(() => null);
-    const found = { entityId: c.entity_id, config, ours: isOurs(config) };
-    if (found.ours) return found;
-    fallback ??= found;
+  for (const id of [...new Set([...byAlias, ...byLabel])]) {
+    const config = await automationConfig(hass, id).catch(() => null);
+    const ours = isOurs(config);
+    const isAuto = (config?.triggers || []).some((t) => t?.id === START_ID[mode]);
+    if (ours && isAuto) return { entityId: id, config, ours };
+    if (byAlias.includes(id)) fallback ??= { entityId: id, config, ours };
   }
   return fallback;
 }
@@ -1379,6 +1446,7 @@ class BeitScheduleCard extends BeitCardBase {
 
   async _loadWeeks() {
     this._weeksSig = this._scheduleSig();
+    const entities = Object.keys(this._hass?.states || {}).filter((id) => id.startsWith('schedule.'));
     if (this._isAdmin) {
       // schedule/list is an admin command, and the only source of what can be edited.
       try {
@@ -1387,16 +1455,26 @@ class BeitScheduleCard extends BeitCardBase {
         this._weeks ??= {};
         this._weeksError = errorText(err);
       }
+      // Which helper each entity is (an entity id can be renamed); asked again only when the set of schedules changes.
+      const sig = entities.slice().sort().join('|');
+      if (sig !== this._idsSig) {
+        this._idsSig = sig;
+        this._ids = await scheduleIdsOf(this._h, entities).catch(() => ({}));
+      }
     }
     // The rest (YAML schedules, or every schedule for a non-admin) is read-only: get_schedule is open to everyone.
-    const rest = Object.keys(this._hass?.states || {})
-      .filter((id) => id.startsWith('schedule.') && !this._weeks?.[id.slice('schedule.'.length)]);
+    const rest = entities.filter((id) => !this._weeks?.[this._idOf(id)]);
     try {
       this._readWeeks = await readSchedules(this._h, rest);
     } catch {
       this._readWeeks ??= {};
     }
     this._render(true);
+  }
+
+  /** The helper id behind a schedule entity. */
+  _idOf(entityId) {
+    return this._ids?.[entityId] ?? entityId.slice('schedule.'.length);
   }
 
   _visible() {
@@ -1447,7 +1525,7 @@ class BeitScheduleCard extends BeitCardBase {
 
   _rowHtml(e, reg, now, canEdit) {
     const t = this._t;
-    const id = e.entity_id.slice('schedule.'.length);
+    const id = this._idOf(e.entity_id);
     const editableWeek = this._weeks?.[id];
     const week = editableWeek || this._readWeeks?.[e.entity_id];
     const yaml = e.attributes?.editable === false || (this._weeks && !week);
@@ -1493,7 +1571,7 @@ class BeitScheduleCard extends BeitCardBase {
         this._opening = false;
       }
       this._render(true);
-      if (!this._weeks?.[entityId.slice('schedule.'.length)] || this._editor) return;
+      if (!this._weeks?.[this._idOf(entityId)] || this._editor) return;
     }
     this._editor = new ScheduleEditor(this, entityId);
     this._editor.open();
@@ -1530,7 +1608,7 @@ class ScheduleEditor {
     this.card = card;
     this.entityId = entityId; // null = a new schedule
     this.isNew = !entityId;
-    this.id = entityId ? entityId.slice('schedule.'.length) : null;
+    this.id = entityId ? card._idOf(entityId) : null;
     this.week = entityId ? card._weeks[this.id].clone() : new WeekSchedule({ name: '' });
     this.mode = entityId ? card._modeOf(entityId) : null;
     this.originalMode = this.mode;
@@ -1601,6 +1679,7 @@ class ScheduleEditor {
       const config = await automationConfig(h, a).catch(() => null);
       if (isOurs(config)) ours.push({ automation: a, config, parsed: parseScheduleAutomation(config) });
     }
+    this.oursAutomations = ours.map((o) => o.automation);
     const editable = ours.filter((o) => o.parsed && o.parsed.scheduleEntityId === this.entityId);
     if (editable.length === 1) {
       this.driven = editable[0];
@@ -1939,8 +2018,9 @@ class ScheduleEditor {
           break;
         }
         const d = DAYS[this.rangeEdit.day];
+        const old = this.rangeEdit.index != null ? w.days[d][this.rangeEdit.index] : null;
         const next = w.days[d].filter((_, k) => k !== this.rangeEdit.index);
-        next.push({ start, end });
+        next.push({ ...(old?.data ? { data: old.data } : {}), start, end });
         w.days[d] = next.sort(byStart);
         this.rangeEdit = null;
         break;
@@ -2030,16 +2110,22 @@ class ScheduleEditor {
       } else {
         await this.automationsReady; // mode and rename need the linked automations
         await updateSchedule(h, this.id, this.week);
-        if (this.driven) await rewriteScheduleAutomation(h, this.driven.config, { scheduleName: this.week.name, target: this.currentTarget() });
+        if (this.driven) {
+          // The alias follows the new name only while it is still the one Beit gave it; renameScheduleAutomations decides.
+          const followsName = this.driven.config.alias === scheduleAlias(this.originalName.trim());
+          await rewriteScheduleAutomation(h, this.driven.config, {
+            scheduleName: followsName ? this.week.name : undefined,
+            target: this.currentTarget(),
+          });
+        }
         await renameScheduleAutomations(h, this.automations || [], this.originalName, this.week.name);
         // Only when the user changed it: the automations may carry a mode the schedule itself does not.
         if (this.mode !== this.originalMode) {
-          const ids = [this.entityId, ...(this.automations || [])];
-          const reg = await loadRegistry(h);
-          for (const m of MODES) {
-            if (this.mode === m) await setModeMembership(h, m, ids, true);
-            else if (labelNamed(reg, m)) await setModeMembership(h, m, ids, false);
-          }
+          // Only the automations Beit wrote for this schedule move: one the user wrote may only mention it.
+          const autos = this.oursAutomations || [];
+          const ids = [this.entityId, ...autos];
+          for (const m of MODES) await setModeMembership(h, m, ids, this.mode === m);
+          await alignWithMode(h, this.mode, autos);
         }
       }
       this.saving = false;
@@ -2067,7 +2153,7 @@ class ScheduleEditor {
     this.saving = true;
     this.render();
     try {
-      const kept = await deleteSchedule(this.card._h, this.entityId);
+      const kept = await deleteSchedule(this.card._h, this.entityId, this.id);
       this.saving = false;
       this.card._afterWrite();
       this.close();

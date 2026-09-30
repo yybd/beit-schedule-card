@@ -295,6 +295,17 @@ const WS = {
     return null;
   },
   'search/related'(msg) {
+    if (msg.item_type === 'label') {
+      // As HA does: automations that target the label, and entities that carry it.
+      const needle = `"label_id":"${msg.item_id}"`;
+      const targeting = Object.values(this._configs).filter((c) => JSON.stringify(c.config).includes(needle)).map((c) => c.entityId);
+      const carrying = this._display.entities.filter((e) => (e.lb || []).includes(msg.item_id)).map((e) => e.ei);
+      const automation = [...new Set([...targeting, ...carrying.filter((id) => id.startsWith('automation.'))])];
+      const out = {};
+      if (automation.length) out.automation = automation;
+      if (carrying.length) out.entity = carrying;
+      return out;
+    }
     const needle = new RegExp(`\\b${msg.item_id.replace('.', '\\.')}\\b`);
     const automation = Object.values(this._configs)
       .filter((c) => needle.test(JSON.stringify(c.config)))
@@ -323,6 +334,15 @@ const WS = {
   },
   'config/entity_registry/list_for_display'() {
     return this._display;
+  },
+  'config/entity_registry/get'(msg) {
+    const e = this._display.entities.find((x) => x.ei === msg.entity_id);
+    if (!e) throw new HAError('not_found', 'Entity not found');
+    const [domain, objectId] = msg.entity_id.split('.');
+    const config = Object.values(this._configs).find((c) => c.entityId === msg.entity_id);
+    const scheduleIds = this._scheduleIds || {};
+    const uniqueId = domain === 'schedule' ? scheduleIds[msg.entity_id] ?? objectId : domain === 'automation' ? config?.config.id ?? objectId : msg.entity_id;
+    return { entity_id: msg.entity_id, unique_id: uniqueId, platform: e.pl, labels: [...(e.lb || [])], disabled_by: null };
   },
   'config/entity_registry/update'(msg) {
     const e = this._display.entities.find((x) => x.ei === msg.entity_id);

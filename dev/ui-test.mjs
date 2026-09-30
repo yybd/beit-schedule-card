@@ -100,6 +100,25 @@ const CHECKS = [
     await sleep(500);
     must(posts().length === 0, 'nothing rewritten');
   `],
+  ['the editor opens on the week HA has now, not a stale copy', '', `
+    // Someone adds a Tuesday range elsewhere; the schedule's state does not change, so the card is not told.
+    fake._schedules = fake._schedules.map((x) => (x.id === 'hot_plate_shabbat' ? { ...x, tuesday: [{ from: '10:00:00', to: '11:00:00' }] } : x));
+    await openEditor('schedule.hot_plate_shabbat');
+    must([...D().querySelectorAll('.day')][2].querySelector('.range')?.textContent.trim() === '10:00–11:00', 'Tuesday from HA');
+  `],
+  ['the dialog cannot be closed while it saves', '', `
+    await openEditor('schedule.hot_plate_shabbat');
+    fake.stateDelay = 0;
+    const slow = fake.callWS.bind(fake);
+    fake.callWS = async (m) => { if (m.type === 'schedule/update') await sleep(400); return slow(m); };
+    click(D().querySelector('[data-act=save]'), 'save');
+    await sleep(50);
+    must(D().querySelector('[data-act=close]').disabled, 'close disabled while saving');
+    D().querySelector('[data-act=close]').click();
+    must(D(), 'still open');
+    await sleep(700);
+    must(!D(), 'closes once saved');
+  `],
   ['range times: 24-hour text, errors kept in place', '', `
     await openEditor('schedule.bedroom_ac_shabbat');
     must(D().querySelector('[data-act=add]'), 'editor');
