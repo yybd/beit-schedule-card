@@ -81,7 +81,8 @@
     source = await connectLive({ writes, language: lang, log, onChange: (h) => push(h) });
   } else {
     const names = ['states', 'schedule_list', 'automation_configs', 'label_registry', 'entity_registry_display', 'area_registry', 'device_registry'];
-    const fixtures = Object.fromEntries(await Promise.all(names.map(async (n) => [n, await (await fetch(`../tests/fixtures/${n}.json`)).json()])));
+    let fixtures = Object.fromEntries(await Promise.all(names.map(async (n) => [n, await (await fetch(`../tests/fixtures/${n}.json`)).json()])));
+    if (lang === 'en') fixtures = (await import('./english-house.mjs')).englishHouse(fixtures);
     const fake = new FakeHass(fixtures, { isAdmin: q.get('admin') !== '0', language: lang, stateDelay: 300 });
     window.fake = fake;
     source = fake;

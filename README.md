@@ -49,15 +49,15 @@
 
 ## Screenshots
 
-All screenshots use the invented house in `tests/fixtures`.
+All screenshots use the invented house in `tests/fixtures`, in English. The cards are Hebrew-first: in Hebrew, the whole layout is right to left.
 
 | Editing a schedule | A new schedule for an air conditioner |
 |:-:|:-:|
 | <img src="docs/editor.png" alt="The editor: name, Shabbat mode, the automations it drives and the week" width="380"> | <img src="docs/new-schedule.png" alt="A new schedule: the device, HVAC mode, temperature and turn off at the end" width="380"> |
 
-| English, dark theme, fixed height | On a phone |
+| Dark theme, fixed height | On a phone |
 |:-:|:-:|
-| <img src="docs/dark-english.png" alt="Both cards in English with a dark theme" width="440"> | <img src="docs/mobile.png" alt="The editor full screen on a phone" width="220"> |
+| <img src="docs/dark-english.png" alt="Both cards with a dark theme and a fixed height" width="440"> | <img src="docs/mobile.png" alt="The editor full screen on a phone" width="220"> |
 
 ## Why Beit Schedule Card
 

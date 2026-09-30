@@ -23,11 +23,11 @@ const BASE = 'http://localhost:8766/dev/card-preview.html?clean=1&';
 const CARDS = "!!document.getElementById('schedules').shadowRoot?.querySelector('.bars') && !!document.getElementById('shabbat').shadowRoot?.querySelector('.mode')";
 const DIALOG = "!!document.getElementById('schedules').shadowRoot?.querySelector('dialog[open] .days')";
 const shots = [
-  ['card.png', 880, 1210, '', CARDS],
-  ['editor.png', 760, 1000, 'open=schedule.living_room_ac_shabbat', DIALOG + " && !!document.getElementById('schedules').shadowRoot.querySelector('dialog .linked .opt')"],
-  ['new-schedule.png', 760, 1000, 'open=new&device=climate.living_room_ac', DIALOG + " && !!document.getElementById('schedules').shadowRoot.querySelector('dialog [data-field=useTemp]')"],
+  ['card.png', 880, 1210, 'lang=en', CARDS],
+  ['editor.png', 760, 1000, 'lang=en&open=schedule.living_room_ac_shabbat', DIALOG + " && !!document.getElementById('schedules').shadowRoot.querySelector('dialog .linked .opt')"],
+  ['new-schedule.png', 760, 1000, 'lang=en&open=new&device=climate.living_room_ac', DIALOG + " && !!document.getElementById('schedules').shadowRoot.querySelector('dialog [data-field=useTemp]')"],
   ['dark-english.png', 880, 1000, 'lang=en&theme=dark&schedules=%7B%22height%22%3A900%7D&shabbat=%7B%22height%22%3A900%7D', CARDS],
-  ['mobile.png', 390, 844, 'open=schedule.bedroom_ac_shabbat', DIALOG],
+  ['mobile.png', 390, 844, 'lang=en&open=schedule.bedroom_ac_shabbat', DIALOG],
 ];
 for (const [file, w, h, query, ready] of shots) {
   await cmd('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 2, mobile: w < 600 });
