@@ -210,13 +210,13 @@ test('an existing auto-Shabbat automation with the marker is recognised and neve
     triggers: [{ trigger: 'time', at: '12:00:00', id: 'erev_shabbat' }], conditions: [], actions: [],
   };
   const states = [...fixtures.states, {
-    entity_id: 'automation.beit_shabbat_auto', state: 'on', attributes: { id: existing.id, friendly_name: AUTO_SHABBAT_ALIAS },
+    entity_id: 'automation.auto_shabbat_older', state: 'on', attributes: { id: existing.id, friendly_name: AUTO_SHABBAT_ALIAS },
     last_changed: '', last_updated: '',
   }];
-  const hass = new FakeHass({ ...fixtures, states, automation_configs: { ...fixtures.automation_configs, 'automation.beit_shabbat_auto': existing } },
+  const hass = new FakeHass({ ...fixtures, states, automation_configs: { ...fixtures.automation_configs, 'automation.auto_shabbat_older': existing } },
     { now: SUNDAY_9AM });
-  assert.equal((await findAutoShabbat(hass)).entityId, 'automation.beit_shabbat_auto');
-  assert.equal(await enableAutoShabbat(hass, FAST), 'automation.beit_shabbat_auto');
+  assert.equal((await findAutoShabbat(hass)).entityId, 'automation.auto_shabbat_older');
+  assert.equal(await enableAutoShabbat(hass, FAST), 'automation.auto_shabbat_older');
   assert.ok(!hass.calls.some((c) => c.method === 'POST'));
   assert.equal(await disableAutoShabbat(hass), 'deleted');
   assert.deepEqual(hass.calls.at(-1), { kind: 'api', method: 'DELETE', path: 'config/automation/config/1700000000000', body: undefined });

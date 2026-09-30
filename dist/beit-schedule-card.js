@@ -11,7 +11,7 @@
  * Custom elements are registered only where `customElements` exists.
  */
 
-export const VERSION = '0.0.0';
+export const VERSION = '1.0.0';
 
 // ---------------------------------------------------------------------------- week model
 
@@ -2187,6 +2187,7 @@ export { BeitScheduleCardEditor, BeitShabbatCardEditor };
 export { BeitScheduleCard, BeitShabbatCard, BeitCardBase };
 
 if (typeof customElements !== 'undefined') {
+  console.info(`%c BEIT-SCHEDULE-CARD %c ${VERSION} `, 'background:#ffa000;color:#000;font-weight:600', 'background:#333;color:#fff');
   if (!customElements.get('beit-schedule-card')) customElements.define('beit-schedule-card', BeitScheduleCard);
   if (!customElements.get('beit-shabbat-card')) customElements.define('beit-shabbat-card', BeitShabbatCard);
   if (!customElements.get('beit-schedule-card-editor')) customElements.define('beit-schedule-card-editor', BeitScheduleCardEditor);

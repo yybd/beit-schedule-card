@@ -13,6 +13,8 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/yybd/beit-schedule-card" alt="License"></a>
 </p>
 
+<p align="center"><img src="docs/card.png" alt="The schedules card and the Shabbat and chag card" width="760"></p>
+
 ---
 
 ## Contents
@@ -202,7 +204,10 @@ Yes. It is a regular dashboard card, so it works wherever your dashboards do.
 Issues and pull requests are welcome.
 
 - Run the tests with `node --test 'tests/*.test.mjs'`.
-- Preview the card without Home Assistant with `python3 dev/serve.py`.
+- Preview the card without Home Assistant with `python3 dev/serve.py`, then open http://localhost:8766. The preview
+  runs on a fake Home Assistant over the synthetic data in `tests/fixtures`. To look at your own Home Assistant, put
+  `{"url": "...", "token": "..."}` in `dev.env.json` (git-ignored) and add `?live=1`. Live mode is read-only unless you
+  also add `&writes=1`.
 
 ## License
 
