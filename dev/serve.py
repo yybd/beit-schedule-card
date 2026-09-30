@@ -96,6 +96,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
     allow_reuse_address = True
+    # The preview fetches every fixture at once; the default backlog of 5 resets some of those connections.
+    request_queue_size = 64
 
 
 if __name__ == "__main__":
